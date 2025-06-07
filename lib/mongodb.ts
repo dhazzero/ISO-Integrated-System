@@ -37,4 +37,11 @@ export async function connectToDatabase(): Promise<{ client: MongoClient, db: Db
         throw error;
     }
 }
-connectToDatabase()
+
+// Panggil fungsi connectToDatabase saat aplikasi dimulai (jika diperlukan untuk inisialisasi awal)
+// atau biarkan koneksi dibuat on-demand saat API dipanggil.
+// Untuk pengembangan, memanggilnya di sini bisa membantu memastikan konfigurasi benar.
+connectToDatabase().catch(console.error);
+
+export default connectToDatabase; // Anda bisa export default jika lebih suka
+
