@@ -5,8 +5,8 @@ import { ObjectId, GridFSBucket } from 'mongodb';
 const COLLECTION_NAME = 'documents';
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
+    request: Request,
+    { params }: { params: { id: string } }
 ) {
   try {
     const { db } = await connectToDatabase();
@@ -32,7 +32,6 @@ export async function DELETE(
       before: document,
     });
 
-
     if (document.fileId) {
       try {
         const bucket = new GridFSBucket(db, { bucketName: 'uploads' });
@@ -51,8 +50,8 @@ export async function DELETE(
 }
 
 export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
+    request: Request,
+    { params }: { params: { id: string } }
 ) {
   try {
     const { db } = await connectToDatabase();
@@ -70,37 +69,47 @@ export async function PUT(
 
     updateData.updatedAt = new Date();
 
-    const { value: updated } = await db.collection(COLLECTION_NAME).findOneAndUpdate(
-      { _id },
-      { $set: updateData },
-      { returnDocument: 'after' }
-    );
+    try {
+      const { value: updated } = await db.collection(COLLECTION_NAME).findOneAndUpdate(
+          { _id },
+          { $set: updateData },
+          { returnDocument: 'after' }  // or { returnNewDocument: true } in older drivers
+      );
 
-    if (updateData.fileId && updateData.fileId !== existing.fileId) {
-      try {
-        if (existing.fileId) {
-          const bucket = new GridFSBucket(db, { bucketName: 'uploads' });
-          await bucket.delete(new ObjectId(String(existing.fileId)));
+      if (updated) {
+        // only execute this after the update is done and we got the updated document
+        console.log('Updated document:', updated);
+        // You can call further functions here:
+        if (updateData.fileId && updateData.fileId !== existing.fileId) {
+          try {
+            if (existing.fileId) {
+              const bucket = new GridFSBucket(db, { bucketName: 'uploads' });
+              await bucket.delete(new ObjectId(String(existing.fileId)));
+            }
+          } catch (err) {
+            console.error('Failed to delete old file:', err);
+          }
         }
-      } catch (err) {
-        console.error('Failed to delete old file:', err);
+
+        await db.collection('documentLogs').insertOne({
+          documentId: id,
+          action: 'UPDATE',
+          user: updateData.updatedBy || 'admin',
+          timestamp: new Date(),
+          before: existing,
+          after: updated,
+        });
+
+        return NextResponse.json({...updated, id: updated._id.toString(), fileId: updated.fileId?.toString?.()});
+      } else {
+        console.log('No document found with that _id.');
       }
+    } catch (error) {
+      console.error('Error during update:', error);
     }
 
-
-    await db.collection('documentLogs').insertOne({
-      documentId: id,
-      action: 'UPDATE',
-      user: updateData.updatedBy || 'admin',
-      timestamp: new Date(),
-      before: existing,
-      after: updated,
-    });
-
-    return NextResponse.json({ ...updated, id: updated._id.toString(), fileId: updated.fileId?.toString?.() });
   } catch (error) {
     console.error('PUT_DOCUMENT_ERROR:', error);
     return NextResponse.json({ message: 'Failed to update document' }, { status: 500 });
   }
 }
-
