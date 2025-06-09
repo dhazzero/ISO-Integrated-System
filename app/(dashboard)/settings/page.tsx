@@ -56,6 +56,7 @@ export default function SettingsPage() {
   });
 
   const [standards, setStandards] = useState<Standard[]>([]);
+  const [documentLogs, setDocumentLogs] = useState<any[]>([]);
   const { toast } = useToast();
 
   const fetchStandards = async () => {
@@ -76,8 +77,20 @@ export default function SettingsPage() {
     }
   };
 
+  const fetchLogs = async () => {
+    try {
+      const res = await fetch('/api/logs/documents');
+      if (!res.ok) throw new Error('Gagal mengambil log');
+      const data = await res.json();
+      setDocumentLogs(data);
+    } catch (err) {
+      console.error('Fetch logs error', err);
+    }
+  };
+
   useEffect(() => {
     fetchStandards();
+    fetchLogs();
   }, []);
 
   const confirmDelete = async () => {
@@ -223,6 +236,7 @@ export default function SettingsPage() {
               <TabsTrigger value="notifications">Notifikasi</TabsTrigger>
               <TabsTrigger value="integrations">Integrasi</TabsTrigger>
               <TabsTrigger value="billing">Billing</TabsTrigger>
+              <TabsTrigger value="logs">Logs</TabsTrigger>
             </TabsList>
 
             {/* Konten Tab Organisasi */}
@@ -403,6 +417,39 @@ export default function SettingsPage() {
               <Card>
                 <CardHeader><CardTitle>Billing</CardTitle><CardDescription>Lihat riwayat tagihan dan kelola langganan Anda</CardDescription></CardHeader>
                 <CardContent><p>Ini adalah konten untuk tab Billing.</p></CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="logs">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Log Dokumen</CardTitle>
+                  <CardDescription>Riwayat perubahan dokumen</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="py-2 px-4 text-left">Waktu</th>
+                          <th className="py-2 px-4 text-left">Dokumen</th>
+                          <th className="py-2 px-4 text-left">Aksi</th>
+                          <th className="py-2 px-4 text-left">User</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {documentLogs.map((log) => (
+                          <tr key={log.id} className="border-b">
+                            <td className="py-2 px-4">{new Date(log.timestamp).toLocaleString()}</td>
+                            <td className="py-2 px-4">{log.before?.name || log.after?.name}</td>
+                            <td className="py-2 px-4">{log.action}</td>
+                            <td className="py-2 px-4">{log.user}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
               </Card>
             </TabsContent>
 

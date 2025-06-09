@@ -12,14 +12,23 @@ export async function GET(request: Request) {
         const { db } = await connectToDatabase(); // Pastikan fungsi ini diimpor
         console.log("API_DOCUMENTS_GET: Successfully connected to database. Fetching documents...");
 
-        const documents = await db.collection(COLLECTION_NAME).find({}).sort({ createdAt: -1 }).toArray();
-        console.log(`API_DOCUMENTS_GET: Found ${documents.length} documents.`);
+        const docsRaw = await db.collection(COLLECTION_NAME)
+            .find({})
+            .sort({ createdAt: -1 })
+            .toArray();
+        console.log(`API_DOCUMENTS_GET: Found ${docsRaw.length} documents.`);
+
+        const documents = docsRaw.map((d: any) => ({
+            ...d,
+            id: d._id?.toString?.() ?? d.id,
+            fileId: d.fileId?.toString?.(),
+        }));
 
         if (documents.length > 0) {
             console.log("API_DOCUMENTS_GET: First document sample:", JSON.stringify(documents[0], null, 2));
         }
 
-        return NextResponse.json(documents); // Pastikan NextResponse diimpor
+        return NextResponse.json(documents);
     } catch (error) {
         console.error("API_DOCUMENTS_GET: Fetch documents error:", error);
         // console.error("API_DOCUMENTS_GET: Error stack:", error instanceof Error ? error.stack : "No stack available");
