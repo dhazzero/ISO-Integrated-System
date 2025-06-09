@@ -90,7 +90,9 @@ export default function DocumentsPage() {
       const allDocuments: DocumentItem[] = rawDocs.map((doc: any) => ({
         ...doc,
         id: doc.id ?? doc._id ?? doc._id?.toString?.() ?? '',
+
         fileId: doc.fileId?.toString?.(),
+
       }));
 
       // Kategorikan dokumen berdasarkan documentType atau field yang sesuai

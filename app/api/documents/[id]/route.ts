@@ -32,6 +32,7 @@ export async function DELETE(
       before: document,
     });
 
+
     if (document.fileId) {
       try {
         const bucket = new GridFSBucket(db, { bucketName: 'uploads' });
@@ -86,6 +87,7 @@ export async function PUT(
       }
     }
 
+
     await db.collection('documentLogs').insertOne({
       documentId: id,
       action: 'UPDATE',
@@ -101,3 +103,4 @@ export async function PUT(
     return NextResponse.json({ message: 'Failed to update document' }, { status: 500 });
   }
 }
+

@@ -1,5 +1,6 @@
 "use client"
 
+
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Upload, X, FileText } from "lucide-react"
+
 
 interface EditDocumentModalProps {
   isOpen: boolean
@@ -252,6 +254,14 @@ export function EditDocumentModal({ isOpen, onClose, document, onUpdated }: Edit
     })
     setSelectedFile(null)
   }, [document])
+  const [formData, setFormData] = useState({
+    name: document?.name || "",
+    description: document?.description || "",
+    status: document?.status || "Draft",
+    version: document?.version || "1.0",
+  })
+  const [saving, setSaving] = useState(false)
+
 
   const handleSave = async () => {
     if (!document) return
@@ -278,6 +288,10 @@ export function EditDocumentModal({ isOpen, onClose, document, onUpdated }: Edit
           updatedBy: "admin",
           ...(newFileId ? { fileId: newFileId } : {}),
         }),
+      const res = await fetch(`/api/documents/${document.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...formData, updatedBy: "admin" }),
       })
       if (!res.ok) {
         const data = await res.json()
@@ -286,6 +300,7 @@ export function EditDocumentModal({ isOpen, onClose, document, onUpdated }: Edit
       onUpdated()
       onClose()
       setSelectedFile(null)
+
     } catch (err) {
       console.error("Update document error", err)
       alert(err instanceof Error ? err.message : "Gagal memperbarui dokumen")
@@ -425,6 +440,30 @@ export function EditDocumentModal({ isOpen, onClose, document, onUpdated }: Edit
                 </div>
               </div>
             )}
+          </div>
+        </div>
+
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Edit Dokumen</DialogTitle>
+          <DialogDescription>Perbarui informasi dokumen</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div>
+            <Label htmlFor="name">Nama Dokumen</Label>
+            <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+          </div>
+          <div>
+            <Label htmlFor="version">Versi</Label>
+            <Input id="version" value={formData.version} onChange={(e) => setFormData({ ...formData, version: e.target.value })} />
+          </div>
+          <div>
+            <Label htmlFor="description">Deskripsi</Label>
+            <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} />
+          </div>
+          <div>
+            <Label htmlFor="status">Status</Label>
+            <Input id="status" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} />
           </div>
         </div>
 
