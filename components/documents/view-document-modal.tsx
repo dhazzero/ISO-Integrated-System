@@ -17,9 +17,10 @@ interface ViewDocumentModalProps {
   isOpen: boolean
   onClose: () => void
   document: any
+  onEdit: (doc: any) => void
 }
 
-export function ViewDocumentModal({ isOpen, onClose, document }: ViewDocumentModalProps) {
+export function ViewDocumentModal({ isOpen, onClose, document, onEdit }: ViewDocumentModalProps) {
   if (!document) return null
 
   const getStatusBadge = (status: string) => {
@@ -58,17 +59,18 @@ export function ViewDocumentModal({ isOpen, onClose, document }: ViewDocumentMod
   }
 
   const handleDownload = () => {
-    // Simulate download
+    if (!document.fileId) return
+
     const link = document.createElement("a")
-    link.href = `/api/documents/${document.id}/download`
-    link.download = `${document.name}_v${document.version}.pdf`
+    link.href = `/api/files/${document.fileId}`
+    link.target = "_blank"
+    link.download = document.name
     link.click()
   }
 
   const handleEdit = () => {
     onClose()
-    // Navigate to edit page or open edit modal
-    console.log("Edit document:", document.id)
+    onEdit(document)
   }
 
   return (
@@ -185,11 +187,18 @@ export function ViewDocumentModal({ isOpen, onClose, document }: ViewDocumentMod
           {/* Document Preview */}
           <div>
             <h3 className="font-medium mb-3">Preview Dokumen</h3>
-            <div className="border rounded-lg p-8 text-center bg-gray-50">
-              <FileText className="mx-auto h-16 w-16 text-gray-400 mb-4" />
-              <p className="text-sm text-muted-foreground mb-2">Preview dokumen tidak tersedia</p>
-              <p className="text-xs text-muted-foreground">Klik download untuk melihat dokumen lengkap</p>
-            </div>
+            {document.fileId ? (
+              <iframe
+                src={`/api/files/${document.fileId}?inline=1`}
+                className="w-full h-96 border rounded"
+              />
+            ) : (
+              <div className="border rounded-lg p-8 text-center bg-gray-50">
+                <FileText className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+                <p className="text-sm text-muted-foreground mb-2">Preview dokumen tidak tersedia</p>
+                <p className="text-xs text-muted-foreground">Klik download untuk melihat dokumen lengkap</p>
+              </div>
+            )}
           </div>
         </div>
 
