@@ -24,6 +24,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
         const downloadStream = bucket.openDownloadStream(fileId);
 
+        const url = new URL(request.url);
+        const inline = url.searchParams.get('inline') === '1' || url.searchParams.get('inline') === 'true';
+
         // Menggunakan ReadableStream untuk respons Next.js
         const readableStream = new ReadableStream({
             start(controller) {
@@ -42,7 +45,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
         const headers = new Headers();
         headers.set('Content-Type', fileMetadata.contentType || 'application/octet-stream');
-        headers.set('Content-Disposition', `attachment; filename="${encodeURIComponent(fileMetadata.filename || 'download')}"`);
+        headers.set('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(fileMetadata.filename || 'download')}"`);
         headers.set('Content-Length', String(fileMetadata.length));
 
 

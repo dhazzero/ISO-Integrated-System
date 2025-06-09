@@ -185,11 +185,18 @@ export function ViewDocumentModal({ isOpen, onClose, document }: ViewDocumentMod
           {/* Document Preview */}
           <div>
             <h3 className="font-medium mb-3">Preview Dokumen</h3>
-            <div className="border rounded-lg p-8 text-center bg-gray-50">
-              <FileText className="mx-auto h-16 w-16 text-gray-400 mb-4" />
-              <p className="text-sm text-muted-foreground mb-2">Preview dokumen tidak tersedia</p>
-              <p className="text-xs text-muted-foreground">Klik download untuk melihat dokumen lengkap</p>
-            </div>
+            {document.fileId ? (
+              <iframe
+                src={`/api/files/${document.fileId}?inline=1`}
+                className="w-full h-96 border rounded"
+              />
+            ) : (
+              <div className="border rounded-lg p-8 text-center bg-gray-50">
+                <FileText className="mx-auto h-16 w-16 text-gray-400 mb-4" />
+                <p className="text-sm text-muted-foreground mb-2">Preview dokumen tidak tersedia</p>
+                <p className="text-xs text-muted-foreground">Klik download untuk melihat dokumen lengkap</p>
+              </div>
+            )}
           </div>
         </div>
 
