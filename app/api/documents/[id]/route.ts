@@ -24,6 +24,7 @@ export async function DELETE(
 
     await db.collection(COLLECTION_NAME).deleteOne({ _id });
 
+
     await db.collection('documentLogs').insertOne({
       documentId: id,
       action: 'DELETE',
@@ -31,6 +32,7 @@ export async function DELETE(
       timestamp: new Date(),
       before: document,
     });
+
 
     if (document.fileId) {
       try {
@@ -90,3 +92,5 @@ export async function PUT(
     return NextResponse.json({ message: 'Failed to update document' }, { status: 500 });
   }
 }
+
+
