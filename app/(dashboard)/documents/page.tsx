@@ -85,7 +85,11 @@ export default function DocumentsPage() {
         const errorData = await response.json();
         throw new Error(errorData.message || `Gagal mengambil dokumen: ${response.statusText}`);
       }
-      const allDocuments: DocumentItem[] = await response.json();
+      const rawDocs: any[] = await response.json();
+      const allDocuments: DocumentItem[] = rawDocs.map((doc: any) => ({
+        ...doc,
+        id: doc.id ?? doc._id ?? doc._id?.toString?.() ?? '',
+      }));
 
       // Kategorikan dokumen berdasarkan documentType atau field yang sesuai
       // Pastikan field 'documentType' atau 'category' ada di data Anda dari database
@@ -165,15 +169,20 @@ export default function DocumentsPage() {
     }
   }
 
-  const handleDeleteDocument = (doc: DocumentItem) => {
-    if (confirm(`Apakah Anda yakin ingin menghapus ${doc.name}?`)) {
-      console.log("Deleting document:", doc.id)
-      // Implement delete logic: panggil API DELETE, lalu fetchDocuments() atau update state
-      // Contoh:
-      // fetch(`/api/documents/${doc.id}`, { method: 'DELETE' })
-      //   .then(res => { if (res.ok) fetchDocuments(); else alert("Gagal menghapus");})
-      //   .catch(err => { console.error(err); alert("Error saat menghapus");});
-      alert(`Hapus: ${doc.name}`); // Placeholder
+  const handleDeleteDocument = async (doc: DocumentItem) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus ${doc.name}?`)) return;
+
+    try {
+      const res = await fetch(`/api/documents/${doc.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || 'Gagal menghapus dokumen');
+      }
+      fetchDocuments();
+      alert(`Dokumen ${doc.name} berhasil dihapus.`);
+    } catch (err) {
+      console.error('Delete document error:', err);
+      alert(err instanceof Error ? err.message : 'Terjadi kesalahan saat menghapus');
     }
   }
 
