@@ -24,7 +24,6 @@ export async function DELETE(
 
     await db.collection(COLLECTION_NAME).deleteOne({ _id });
 
-
     await db.collection('documentLogs').insertOne({
       documentId: id,
       action: 'DELETE',
@@ -77,6 +76,18 @@ export async function PUT(
       { returnDocument: 'after' }
     );
 
+    if (updateData.fileId && updateData.fileId !== existing.fileId) {
+      try {
+        if (existing.fileId) {
+          const bucket = new GridFSBucket(db, { bucketName: 'uploads' });
+          await bucket.delete(new ObjectId(String(existing.fileId)));
+        }
+      } catch (err) {
+        console.error('Failed to delete old file:', err);
+      }
+    }
+
+
     await db.collection('documentLogs').insertOne({
       documentId: id,
       action: 'UPDATE',
@@ -92,5 +103,4 @@ export async function PUT(
     return NextResponse.json({ message: 'Failed to update document' }, { status: 500 });
   }
 }
-
 

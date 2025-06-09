@@ -93,7 +93,6 @@ export default function DocumentsPage() {
 
         fileId: doc.fileId?.toString?.(),
 
-
       }));
 
       // Kategorikan dokumen berdasarkan documentType atau field yang sesuai
