@@ -51,6 +51,17 @@ export async function DELETE(
   }
 }
 
+    if (updateData.fileId && updateData.fileId !== existing.fileId) {
+      try {
+        if (existing.fileId) {
+          const bucket = new GridFSBucket(db, { bucketName: 'uploads' });
+          await bucket.delete(new ObjectId(String(existing.fileId)));
+        }
+      } catch (err) {
+        console.error('Failed to delete old file:', err);
+      }
+    }
+
 export async function PUT(
   request: Request,
   { params }: { params: { id: string } }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -29,15 +29,48 @@ export function EditDocumentModal({ isOpen, onClose, document, onUpdated }: Edit
     version: document?.version || "1.0",
   })
   const [saving, setSaving] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null
+    setSelectedFile(file)
+  }
+
+  useEffect(() => {
+    setFormData({
+      name: document?.name || "",
+      description: document?.description || "",
+      status: document?.status || "Draft",
+      version: document?.version || "1.0",
+    })
+    setSelectedFile(null)
+  }, [document])
 
   const handleSave = async () => {
     if (!document) return
     setSaving(true)
     try {
+      let newFileId: string | undefined
+      if (selectedFile) {
+        const fd = new FormData()
+        fd.append('file', selectedFile)
+        const uploadRes = await fetch('/api/upload', { method: 'POST', body: fd })
+        if (!uploadRes.ok) {
+          const d = await uploadRes.json()
+          throw new Error(d.message || 'Gagal mengunggah file')
+        }
+        const upData = await uploadRes.json()
+        newFileId = upData.fileId
+      }
+
       const res = await fetch(`/api/documents/${document.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, updatedBy: "admin" }),
+        body: JSON.stringify({
+          ...formData,
+          updatedBy: "admin",
+          ...(newFileId ? { fileId: newFileId } : {}),
+        }),
       })
       if (!res.ok) {
         const data = await res.json()
@@ -45,6 +78,7 @@ export function EditDocumentModal({ isOpen, onClose, document, onUpdated }: Edit
       }
       onUpdated()
       onClose()
+      setSelectedFile(null)
     } catch (err) {
       console.error("Update document error", err)
       alert(err instanceof Error ? err.message : "Gagal memperbarui dokumen")
@@ -76,6 +110,21 @@ export function EditDocumentModal({ isOpen, onClose, document, onUpdated }: Edit
           <div>
             <Label htmlFor="status">Status</Label>
             <Input id="status" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} />
+          </div>
+          <div>
+            <Label>File Saat Ini</Label>
+            {document?.fileId ? (
+              <a href={`/api/files/${document.fileId}`} target="_blank" className="text-blue-600 underline text-sm">Lihat file</a>
+            ) : (
+              <p className="text-sm text-muted-foreground">Tidak ada file</p>
+            )}
+          </div>
+          <div>
+            <Label htmlFor="file">Ganti File</Label>
+            <Input id="file" type="file" onChange={handleFileChange} />
+            {selectedFile && (
+              <p className="text-sm mt-1">{selectedFile.name}</p>
+            )}
           </div>
         </div>
         <DialogFooter>
