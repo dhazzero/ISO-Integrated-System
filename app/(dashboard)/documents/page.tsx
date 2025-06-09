@@ -33,6 +33,7 @@ import { Progress } from "@/components/ui/progress" // Import Progress jika belu
 import { AddDocumentModal } from "@/components/documents/add-document-modal"
 import { UploadDocumentModal } from "@/components/documents/upload-document-modal"
 import { ViewDocumentModal } from "@/components/documents/view-document-modal"
+import { EditDocumentModal } from "@/components/documents/edit-document-modal"
 
 // Definisikan tipe untuk dokumen jika belum ada (opsional tapi direkomendasikan)
 interface DocumentItem {
@@ -89,6 +90,10 @@ export default function DocumentsPage() {
       const allDocuments: DocumentItem[] = rawDocs.map((doc: any) => ({
         ...doc,
         id: doc.id ?? doc._id ?? doc._id?.toString?.() ?? '',
+
+        fileId: doc.fileId?.toString?.(),
+
+
       }));
 
       // Kategorikan dokumen berdasarkan documentType atau field yang sesuai
@@ -113,6 +118,10 @@ export default function DocumentsPage() {
 
   const handleNewDocumentAdded = (newDocument: DocumentItem) => {
     fetchDocuments(); // Refresh data setelah dokumen baru ditambahkan
+  };
+
+  const handleDocumentUpdated = () => {
+    fetchDocuments();
   };
 
   const getStatusBadge = (status: DocumentItem['status']) => {
@@ -157,8 +166,7 @@ export default function DocumentsPage() {
 
   const handleEditDocument = (doc: DocumentItem) => {
     setSelectedDocument(doc)
-    // setIsEditModalOpen(true); // Aktifkan jika Anda punya modal edit
-    alert(`Edit: ${doc.name}`); // Placeholder
+    setIsEditModalOpen(true)
   }
 
   const handleDownloadDocument = (doc: DocumentItem) => {
@@ -437,6 +445,13 @@ export default function DocumentsPage() {
             isOpen={isViewModalOpen}
             onClose={() => setIsViewModalOpen(false)}
             document={selectedDocument}
+            onEdit={handleEditDocument}
+        />
+        <EditDocumentModal
+            isOpen={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            document={selectedDocument}
+            onUpdated={handleDocumentUpdated}
         />
       </div>
   );

@@ -24,6 +24,16 @@ export async function DELETE(
 
     await db.collection(COLLECTION_NAME).deleteOne({ _id });
 
+
+    await db.collection('documentLogs').insertOne({
+      documentId: id,
+      action: 'DELETE',
+      user: 'admin',
+      timestamp: new Date(),
+      before: document,
+    });
+
+
     if (document.fileId) {
       try {
         const bucket = new GridFSBucket(db, { bucketName: 'uploads' });
@@ -40,3 +50,47 @@ export async function DELETE(
     return NextResponse.json({ message: 'Failed to delete document' }, { status: 500 });
   }
 }
+
+export async function PUT(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { db } = await connectToDatabase();
+    const id = params.id;
+    if (!id || !ObjectId.isValid(id)) {
+      return NextResponse.json({ message: 'Invalid document id' }, { status: 400 });
+    }
+    const _id = new ObjectId(id);
+
+    const updateData = await request.json();
+    const existing = await db.collection(COLLECTION_NAME).findOne({ _id });
+    if (!existing) {
+      return NextResponse.json({ message: 'Document not found' }, { status: 404 });
+    }
+
+    updateData.updatedAt = new Date();
+
+    const { value: updated } = await db.collection(COLLECTION_NAME).findOneAndUpdate(
+      { _id },
+      { $set: updateData },
+      { returnDocument: 'after' }
+    );
+
+    await db.collection('documentLogs').insertOne({
+      documentId: id,
+      action: 'UPDATE',
+      user: updateData.updatedBy || 'admin',
+      timestamp: new Date(),
+      before: existing,
+      after: updated,
+    });
+
+    return NextResponse.json({ ...updated, id: updated._id.toString(), fileId: updated.fileId?.toString?.() });
+  } catch (error) {
+    console.error('PUT_DOCUMENT_ERROR:', error);
+    return NextResponse.json({ message: 'Failed to update document' }, { status: 500 });
+  }
+}
+
+
