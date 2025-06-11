@@ -1,4 +1,5 @@
-"use client" // Client component
+// app/(dashboard)/documents/page.tsx
+"use client"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -8,13 +9,11 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu" // <-- IMPORT TAMBAHAN
 import {
   FileText,
   Upload,
@@ -28,7 +27,7 @@ import {
   AlertCircle,
   Plus,
 } from "lucide-react"
-import { Progress } from "@/components/ui/progress" // Import Progress jika belum ada
+import { Progress } from "@/components/ui/progress"
 
 import { AddDocumentModal } from "@/components/documents/add-document-modal"
 import { UploadDocumentModal } from "@/components/documents/upload-document-modal"
@@ -58,15 +57,14 @@ interface DocumentItem {
 export default function DocumentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-  // selectedCategory tidak digunakan di kode awal, bisa dihapus jika tidak perlu
-  // const [selectedCategory, setSelectedCategory] = useState("all")
 
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  // State untuk modal yang berbeda
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false) // State untuk AddDocumentModal
   const [selectedDocumentType, setSelectedDocumentType] = useState("")
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [selectedDocument, setSelectedDocument] = useState<DocumentItem | null>(null)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false) // State ini belum digunakan, tambahkan logika jika perlu
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
 
   const [policies, setPolicies] = useState<DocumentItem[]>([]);
   const [procedures, setProcedures] = useState<DocumentItem[]>([]);
@@ -90,13 +88,9 @@ export default function DocumentsPage() {
       const allDocuments: DocumentItem[] = rawDocs.map((doc: any) => ({
         ...doc,
         id: doc.id ?? doc._id ?? doc._id?.toString?.() ?? '',
-
         fileId: doc.fileId?.toString?.(),
-
       }));
 
-      // Kategorikan dokumen berdasarkan documentType atau field yang sesuai
-      // Pastikan field 'documentType' atau 'category' ada di data Anda dari database
       setPolicies(allDocuments.filter(doc => doc.documentType === "Kebijakan" || doc.category === "Kebijakan"));
       setProcedures(allDocuments.filter(doc => doc.documentType === "Prosedur" || doc.category === "Prosedur"));
       setWorkInstructions(allDocuments.filter(doc => doc.documentType === "Instruksi Kerja" || doc.category === "Instruksi Kerja"));
@@ -116,7 +110,7 @@ export default function DocumentsPage() {
   }, []);
 
   const handleNewDocumentAdded = (newDocument: DocumentItem) => {
-    fetchDocuments(); // Refresh data setelah dokumen baru ditambahkan
+    fetchDocuments();
   };
 
   const handleDocumentUpdated = () => {
@@ -153,6 +147,7 @@ export default function DocumentsPage() {
     }
   }
 
+  // Fungsi ini sekarang langsung membuka modal pembuatan dokumen
   const handleAddDocumentClick = (type: string) => {
     setSelectedDocumentType(type)
     setIsAddModalOpen(true)
@@ -193,7 +188,6 @@ export default function DocumentsPage() {
     }
   }
 
-  // Gabungkan semua dokumen untuk tab "Semua" dan filter
   const allDocuments = [...policies, ...procedures, ...workInstructions, ...forms, ...manuals];
 
   const filteredDocuments = allDocuments.filter(doc => {
@@ -203,9 +197,7 @@ export default function DocumentsPage() {
     return matchesSearchTerm && matchesStatus;
   });
 
-  // Hitung total dokumen untuk setiap tab
   const totalAll = policies.length + procedures.length + workInstructions.length + forms.length + manuals.length;
-
 
   const DocumentTable = ({ documents, extraColumns = [] }: { documents: DocumentItem[]; extraColumns?: string[] }) => (
       <div className="overflow-x-auto">
@@ -217,7 +209,6 @@ export default function DocumentsPage() {
             <th className="text-left py-3 px-4">Status</th>
             {extraColumns.map((col) => (
                 <th key={col} className="text-left py-3 px-4">
-                  {/* Menggunakan judul kolom yang lebih user-friendly */}
                   {col === "approver" ? "Approver" :
                       col === "owner" ? "Owner" :
                           col === "department" ? "Department" :
@@ -291,7 +282,7 @@ export default function DocumentsPage() {
           <div className="flex justify-center items-center h-64">
             <div className="text-center">
               <p className="text-lg font-semibold mb-2">Memuat data dokumen...</p>
-              <Progress value={50} className="w-64 mx-auto" /> {/* Contoh progress bar */}
+              <Progress value={50} className="w-64 mx-auto" />
             </div>
           </div>
         </div>
@@ -307,28 +298,25 @@ export default function DocumentsPage() {
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Manajemen Dokumentasi</h1>
           <div className="flex space-x-2">
-            <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-              <DialogTrigger asChild>
+            {/* === PERUBAHAN DI SINI === */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <Button>
                   <Plus className="mr-2 h-4 w-4" />
                   Buat Dokumen
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Buat Dokumen Baru</DialogTitle>
-                  <DialogDescription>Pilih jenis dokumen yang akan dibuat</DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  {["Kebijakan", "Prosedur", "Instruksi Kerja", "Formulir", "Manual"].map(type => (
-                      <Button key={type} variant="outline" className="justify-start" onClick={() => handleAddDocumentClick(type)}>
-                        <FileText className="mr-2 h-4 w-4" />
-                        {type}
-                      </Button>
-                  ))}
-                </div>
-              </DialogContent>
-            </Dialog>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {["Kebijakan", "Prosedur", "Instruksi Kerja", "Formulir", "Manual"].map(type => (
+                    <DropdownMenuItem key={type} onSelect={() => handleAddDocumentClick(type)}>
+                      <FileText className="mr-2 h-4 w-4" />
+                      <span>{type}</span>
+                    </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {/* ======================= */}
+
             <Button variant="outline" onClick={() => setIsUploadModalOpen(true)}>
               <Upload className="mr-2 h-4 w-4" />
               Unggah
@@ -336,7 +324,7 @@ export default function DocumentsPage() {
           </div>
         </div>
 
-        {/* Statistics Cards - Anda bisa mengkalkulasi ini dari data yang di-fetch */}
+        {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm">Total Dokumen</CardTitle></CardHeader>
@@ -398,7 +386,7 @@ export default function DocumentsPage() {
           <TabsContent value="all">
             <Card>
               <CardHeader><CardTitle>Semua Dokumen</CardTitle><CardDescription>Daftar lengkap semua dokumen dalam sistem</CardDescription></CardHeader>
-              <CardContent><DocumentTable documents={filteredDocuments} extraColumns={["category"]} /></CardContent> {/* Tampilkan 'category' atau 'documentType' */}
+              <CardContent><DocumentTable documents={filteredDocuments} extraColumns={["category"]} /></CardContent>
             </Card>
           </TabsContent>
           <TabsContent value="policies">
@@ -433,6 +421,7 @@ export default function DocumentsPage() {
           </TabsContent>
         </Tabs>
 
+        {/* Modals */}
         <AddDocumentModal
             isOpen={isAddModalOpen}
             onClose={() => setIsAddModalOpen(false)}
