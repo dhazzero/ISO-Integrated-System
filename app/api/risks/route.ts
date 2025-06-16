@@ -4,9 +4,6 @@ import { connectToDatabase } from '@/lib/mongodb';
 
 const RISKS_COLLECTION = 'risks';
 
-
-// --- TAMBAHKAN ATAU PASTIKAN FUNGSI GET INI ADA ---
-
 // GET semua data risiko
 export async function GET() {
     try {
@@ -18,72 +15,76 @@ export async function GET() {
     }
 }
 
-// POST risiko baru (diperbarui dengan penilaian inheren & residual)
+// POST risiko baru (diperbarui dengan struktur data lengkap)
 export async function POST(request: Request) {
     try {
         const data = await request.json();
         const { db } = await connectToDatabase();
 
-        if (!data.name || !data.category || !data.owner || !data.inherentLikelihood || !data.inherentImpact || !data.residualLikelihood || !data.residualImpact) {
-            return NextResponse.json({ message: 'Field yang dibutuhkan tidak lengkap' }, { status: 400 });
+        // Validasi dasar
+        if (!data.name || !data.riskOwner || !data.inherentLikelihoodScore || !data.inherentImpactScore) {
+            return NextResponse.json({ message: 'Field dasar (Nama, Owner, Penilaian Inheren) wajib diisi' }, { status: 400 });
         }
 
-        // --- PERUBAHAN DI SINI ---
+        // Fungsi helper untuk kalkulasi di backend
+        const getRiskDetails = (likelihoodScore: number, impactScore: number) => {
+            const levelMap = ["", "Rendah", "Rendah-Sedang", "Sedang", "Tinggi", "Sangat Tinggi"];
+            const score = likelihoodScore * impactScore;
 
-        // Fungsi helper untuk kalkulasi, bisa diletakkan di sini
-        const calculateRiskLevel = (likelihood: string, impact: string): string => {
-            const scoreMap: { [key: string]: number } = { "Sangat Rendah": 1, "Rendah": 2, "Sedang": 3, "Tinggi": 4, "Sangat Tinggi": 5 };
-            const likeScore = scoreMap[likelihood] || 0;
-            const impactScore = scoreMap[impact] || 0;
-            const totalScore = likeScore * impactScore;
+            let level = "Rendah";
+            if (score >= 15) level = "Sangat Tinggi";
+            else if (score >= 9) level = "Tinggi";
+            else if (score >= 5) level = "Sedang";
+            else if (score >= 2) level = "Rendah-Sedang";
 
-            if (totalScore >= 15) return "Sangat Tinggi";
-            if (totalScore >= 9) return "Tinggi";
-            if (totalScore >= 5) return "Sedang";
-            if (totalScore >= 2) return "Rendah";
-            return "Sangat Rendah";
+            let treatment = "ACCEPT";
+            if (score >= 12) treatment = "AVOID";
+            else if (score >= 8) treatment = "TRANSFER - AVOID";
+            else if (score >= 4) treatment = "TRANSFER - REDUCED";
+
+            return { level, treatment, score, likelihood: levelMap[likelihoodScore], impact: levelMap[impactScore] };
         };
 
-        const residualLevel = calculateRiskLevel(data.residualLikelihood, data.residualImpact);
+        const inherent = getRiskDetails(Number(data.inherentLikelihoodScore), Number(data.inherentImpactScore));
+        const residual = getRiskDetails(Number(data.residualLikelihoodScore), Number(data.residualImpactScore));
 
         const newRisk = {
+            // Identifikasi Risiko
             name: data.name,
-            description: data.description || "",
+            asset: data.asset || "",
+            threat: data.threat || "",
+            vulnerability: data.vulnerability || "",
+            impactDescription: data.impactDescription || data.description,
             category: data.category,
-            owner: data.owner || "N/A",
+            riskOwner: data.riskOwner,
+
+            // Penilaian & Level
+            inherentRisk: { ...inherent, likelihoodScore: Number(data.inherentLikelihoodScore), impactScore: Number(data.inherentImpactScore) },
+            residualRisk: { ...residual, likelihoodScore: Number(data.residualLikelihoodScore), impactScore: Number(data.residualImpactScore) },
+
+            // Level atas untuk kemudahan di tabel register
+            level: residual.level,
+            likelihood: residual.likelihood,
+            impact: residual.impact,
+
+            // Rencana Tindakan & Mitigasi
+            controlActivities: data.controlActivities || "",
+            mitigationPlan: data.mitigationPlan || "Akan ditentukan",
+            proposedAction: data.proposedAction || "",
+            opportunity: data.opportunity || "",
+            targetDate: data.targetDate || null,
+            monitoring: data.monitoring || "",
+            pic: data.pic || data.riskOwner,
             status: data.status || 'Open',
-            trend: 'stable',
 
-            // Menambahkan field level atas untuk kemudahan tampilan di tabel utama
-            level: residualLevel,
-            likelihood: data.residualLikelihood, // Mengambil dari penilaian residual
-            impact: data.residualImpact,       // Mengambil dari penilaian residual
-
-            // Menyimpan data penilaian yang detail
-            inherentRisk: {
-                likelihood: data.inherentLikelihood,
-                impact: data.inherentImpact,
-                level: calculateRiskLevel(data.inherentLikelihood, data.inherentImpact),
-            },
-            residualRisk: {
-                likelihood: data.residualLikelihood,
-                impact: data.residualImpact,
-                level: residualLevel,
-            },
-
-            controls: [],
-            mitigationActions: [],
-            history: [{ date: new Date().toISOString(), action: "Risiko dibuat", user: "Admin System" }],
+            // Timestamps
             createdAt: new Date(),
             updatedAt: new Date(),
+            history: [{ date: new Date().toISOString(), action: "Risiko dibuat", user: "Admin System" }],
         };
 
-        // --- AKHIR PERUBAHAN ---
-
         const result = await db.collection('risks').insertOne(newRisk);
-        const insertedRisk = await db.collection('risks').findOne({ _id: result.insertedId });
-
-        return NextResponse.json(insertedRisk, { status: 201 });
+        return NextResponse.json(result, { status: 201 });
     } catch (error) {
         return NextResponse.json({ message: 'Gagal membuat risiko', error: (error as Error).message }, { status: 500 });
     }

@@ -1,15 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -20,63 +12,30 @@ import { useState, FormEvent } from "react"
 import { useToast } from "@/components/ui/use-toast"
 
 export function AddRiskModal({ onRiskAdded }: { onRiskAdded: () => void }) {
-  const [open, setOpen] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [open, setOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   const initialFormData = {
-    name: "",
-    description: "",
-    category: "",
-    owner: "",
-    status: "Open",
-    inherentLikelihood: "",
-    inherentImpact: "",
-    residualLikelihood: "",
-    residualImpact: "",
-  }
+    name: "", asset: "", threat: "", vulnerability: "", impactDescription: "",
+    category: "", riskOwner: "", pic: "",
+    inherentLikelihoodScore: "0", inherentImpactScore: "0",
+    residualLikelihoodScore: "0", residualImpactScore: "0",
+    controlActivities: "", proposedAction: "", opportunity: "",
+    targetDate: "", monitoring: "", status: "Open",
+  };
   const [formData, setFormData] = useState(initialFormData);
 
   const handleInputChange = (field: keyof typeof formData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const calculateRiskLevel = (likelihood: string, impact: string): string => {
-    const scoreMap: { [key: string]: number } = { "Sangat Rendah": 1, "Rendah": 2, "Sedang": 3, "Tinggi": 4, "Sangat Tinggi": 5 };
-    const likeScore = scoreMap[likelihood] || 0;
-    const impactScore = scoreMap[impact] || 0;
-    const totalScore = likeScore * impactScore;
-
-    if (totalScore >= 15) return "Sangat Tinggi";
-    if (totalScore >= 9) return "Tinggi";
-    if (totalScore >= 5) return "Sedang";
-    if (totalScore >= 2) return "Rendah";
-    return "Sangat Rendah";
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
-    const riskDataToSave = {
-      ...formData,
-      inherentLevel: calculateRiskLevel(formData.inherentLikelihood, formData.inherentImpact),
-      residualLevel: calculateRiskLevel(formData.residualLikelihood, formData.residualImpact),
-      level: calculateRiskLevel(formData.residualLikelihood, formData.residualImpact),
-    };
-
     try {
-      const response = await fetch('/api/risks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(riskDataToSave),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Gagal menyimpan risiko');
-      }
-
+      const response = await fetch('/api/risks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData) });
+      if (!response.ok) { const errData = await response.json(); throw new Error(errData.message || 'Gagal'); }
       toast({ title: "Sukses", description: "Risiko baru berhasil ditambahkan." });
       onRiskAdded();
       setOpen(false);
@@ -88,60 +47,59 @@ export function AddRiskModal({ onRiskAdded }: { onRiskAdded: () => void }) {
     }
   };
 
+  const scoreOptions = ["1", "2", "3", "4", "5"];
   const categories = ["Keamanan Informasi", "Operasional", "Kepatuhan", "Teknologi", "K3", "Keuangan", "Reputasi"];
-  const levels = ["Sangat Rendah", "Rendah", "Sedang", "Tinggi", "Sangat Tinggi"];
-  const statuses = ["Open", "Closed", "Under Review", "Mitigated"];
+  const statuses = ["Open", "In Progress", "Mitigated", "Closed"];
 
   return (
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Tambah Risiko
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Tambah Risiko Baru</DialogTitle>
-            <DialogDescription>Lengkapi semua informasi risiko termasuk penilaian inheren dan residual.</DialogDescription>
-          </DialogHeader>
+        <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />Tambah Risiko</Button></DialogTrigger>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Tambah Risiko Baru (Sesuai Register)</DialogTitle><DialogDescription>Lengkapi semua informasi risiko.</DialogDescription></DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-6 pt-4">
+
             <Card>
-              <CardHeader><CardTitle>Informasi Umum</CardTitle></CardHeader>
+              <CardHeader><CardTitle>1. Identifikasi Risiko</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label htmlFor="name">Nama Risiko *</Label><Input id="name" value={formData.name} onChange={(e) => handleInputChange("name", e.target.value)} required /></div>
-                  <div className="space-y-2"><Label htmlFor="category">Kategori *</Label><Select value={formData.category} onValueChange={(v) => handleInputChange("category", v)}><SelectTrigger><SelectValue placeholder="Pilih kategori" /></SelectTrigger><SelectContent>{categories.map((c) => (<SelectItem key={c} value={c}>{c}</SelectItem>))}</SelectContent></Select></div>
-                </div>
-                <div className="space-y-2"><Label htmlFor="description">Deskripsi</Label><Textarea id="description" value={formData.description} onChange={(e) => handleInputChange("description", e.target.value)} rows={3} /></div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label htmlFor="owner">Pemilik Risiko *</Label><Input id="owner" value={formData.owner} onChange={(e) => handleInputChange("owner", e.target.value)} required /></div>
-                  <div className="space-y-2"><Label htmlFor="status">Status *</Label><Select value={formData.status} onValueChange={(v) => handleInputChange("status", v)}><SelectTrigger><SelectValue placeholder="Pilih status" /></SelectTrigger><SelectContent>{statuses.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}</SelectContent></Select></div>
+                <div className="grid md:grid-cols-2 gap-4"><div className="space-y-2"><Label>Nama Risiko *</Label><Input value={formData.name} onChange={(e) => handleInputChange("name", e.target.value)} required /></div><div className="space-y-2"><Label>Aset / Proses Terkait</Label><Input value={formData.asset} onChange={(e) => handleInputChange("asset", e.target.value)} /></div></div>
+                <div className="grid md:grid-cols-2 gap-4"><div className="space-y-2"><Label>Ancaman (Threat)</Label><Input value={formData.threat} onChange={(e) => handleInputChange("threat", e.target.value)} /></div><div className="space-y-2"><Label>Kelemahan (Vulnerability)</Label><Input value={formData.vulnerability} onChange={(e) => handleInputChange("vulnerability", e.target.value)} /></div></div>
+                <div className="space-y-2"><Label>Uraian Dampak Risiko</Label><Textarea value={formData.impactDescription} onChange={(e) => handleInputChange("impactDescription", e.target.value)} /></div>
+                <div className="grid md:grid-cols-2 gap-4"><div className="space-y-2"><Label>Kategori *</Label><Select value={formData.category} onValueChange={(v) => handleInputChange("category", v)}><SelectTrigger><SelectValue placeholder="Pilih Kategori"/></SelectTrigger><SelectContent>{categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label>Risk Owner *</Label><Input value={formData.riskOwner} onChange={(e) => handleInputChange("riskOwner", e.target.value)} required/></div></div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle>2. Penilaian Risiko</CardTitle></CardHeader>
+              <CardContent className="space-y-6">
+                <div><h4 className="font-semibold text-md">Risiko Inheren (Sebelum Kontrol)</h4>
+                  <div className="grid md:grid-cols-2 gap-4 mt-2">
+                    <div className="space-y-2"><Label>Kemungkinan (Skor 1-5) *</Label><Select value={formData.inherentLikelihoodScore} onValueChange={(v) => handleInputChange("inherentLikelihoodScore", v)} required><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{scoreOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+                    <div className="space-y-2"><Label>Dampak (Skor 1-5) *</Label><Select value={formData.inherentImpactScore} onValueChange={(v) => handleInputChange("inherentImpactScore", v)} required><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{scoreOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+                  </div></div>
+                <div><h4 className="font-semibold text-md">Risiko Residual (Setelah Kontrol)</h4>
+                  <div className="grid md:grid-cols-2 gap-4 mt-2">
+                    <div className="space-y-2"><Label>Kemungkinan (Skor 1-5) *</Label><Select value={formData.residualLikelihoodScore} onValueChange={(v) => handleInputChange("residualLikelihoodScore", v)} required><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{scoreOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+                    <div className="space-y-2"><Label>Dampak (Skor 1-5) *</Label><Select value={formData.residualImpactScore} onValueChange={(v) => handleInputChange("residualImpactScore", v)} required><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{scoreOptions.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+                  </div></div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle>3. Rencana Tindakan & Mitigasi</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2"><Label>Aktivitas Kontrol Saat Ini</Label><Textarea value={formData.controlActivities} onChange={(e) => handleInputChange("controlActivities", e.target.value)} /></div>
+                <div className="space-y-2"><Label>Usulan Tindakan Mitigasi</Label><Textarea value={formData.proposedAction} onChange={(e) => handleInputChange("proposedAction", e.target.value)} /></div>
+                <div className="space-y-2"><Label>Peluang (Opportunity)</Label><Textarea value={formData.opportunity} onChange={(e) => handleInputChange("opportunity", e.target.value)} /></div>
+                <div className="space-y-2"><Label>Monitoring</Label><Textarea value={formData.monitoring} onChange={(e) => handleInputChange("monitoring", e.target.value)} /></div>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div className="space-y-2"><Label>Target Penyelesaian</Label><Input type="date" value={formData.targetDate} onChange={(e) => handleInputChange("targetDate", e.target.value)} /></div>
+                  <div className="space-y-2"><Label>PIC</Label><Input value={formData.pic} onChange={(e) => handleInputChange("pic", e.target.value)} /></div>
+                  <div className="space-y-2"><Label>Status</Label><Select value={formData.status} onValueChange={(v) => handleInputChange("status", v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{statuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
                 </div>
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader><CardTitle>Penilaian Risiko Inheren</CardTitle><CardDescription>Penilaian risiko sebelum penerapan kontrol.</CardDescription></CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label htmlFor="inherentLikelihood">Kemungkinan *</Label><Select value={formData.inherentLikelihood} onValueChange={(v) => handleInputChange("inherentLikelihood", v)}><SelectTrigger><SelectValue placeholder="Pilih kemungkinan" /></SelectTrigger><SelectContent>{levels.map((l) => (<SelectItem key={l} value={l}>{l}</SelectItem>))}</SelectContent></Select></div>
-                  <div className="space-y-2"><Label htmlFor="inherentImpact">Dampak *</Label><Select value={formData.inherentImpact} onValueChange={(v) => handleInputChange("inherentImpact", v)}><SelectTrigger><SelectValue placeholder="Pilih dampak" /></SelectTrigger><SelectContent>{levels.map((l) => (<SelectItem key={l} value={l}>{l}</SelectItem>))}</SelectContent></Select></div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader><CardTitle>Penilaian Risiko Residual</CardTitle><CardDescription>Penilaian risiko setelah penerapan kontrol.</CardDescription></CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label htmlFor="residualLikelihood">Kemungkinan *</Label><Select value={formData.residualLikelihood} onValueChange={(v) => handleInputChange("residualLikelihood", v)}><SelectTrigger><SelectValue placeholder="Pilih kemungkinan" /></SelectTrigger><SelectContent>{levels.map((l) => (<SelectItem key={l} value={l}>{l}</SelectItem>))}</SelectContent></Select></div>
-                  <div className="space-y-2"><Label htmlFor="residualImpact">Dampak *</Label><Select value={formData.residualImpact} onValueChange={(v) => handleInputChange("residualImpact", v)}><SelectTrigger><SelectValue placeholder="Pilih dampak" /></SelectTrigger><SelectContent>{levels.map((l) => (<SelectItem key={l} value={l}>{l}</SelectItem>))}</SelectContent></Select></div>
-                </div>
-              </CardContent>
-            </Card>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Batal</Button>
-              <Button type="submit" disabled={isLoading}>{isLoading ? "Menyimpan..." : "Simpan Risiko"}</Button>
-            </DialogFooter>
+
+            <DialogFooter><Button type="button" variant="outline" onClick={() => setOpen(false)}>Batal</Button><Button type="submit" disabled={isLoading}>{isLoading ? "Menyimpan..." : "Simpan Risiko"}</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
