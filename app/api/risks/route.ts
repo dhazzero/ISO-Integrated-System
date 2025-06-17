@@ -1,6 +1,7 @@
 // app/api/risks/route.ts
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
+import { logActivity } from '@/lib/logger'; // <-- Import logger
 
 const RISKS_COLLECTION = 'risks';
 
@@ -8,7 +9,7 @@ const RISKS_COLLECTION = 'risks';
 export async function GET() {
     try {
         const { db } = await connectToDatabase();
-        const risks = await db.collection(RISKS_COLLECTION).find({}).sort({ createdAt: -1 }).toArray();
+        const risks = await db.collection(RISKS_COLLECTION).find({ deleted: { $ne: true } }).sort({ createdAt: -1 }).toArray();
         return NextResponse.json(risks);
     } catch (error) {
         return NextResponse.json({ message: 'Gagal mengambil data risiko', error: (error as Error).message }, { status: 500 });
@@ -105,6 +106,8 @@ export async function POST(request: Request) {
 
             // Rencana Tindakan & Mitigasi
             controls: data.controls || [],
+            mitigationActions: data.mitigationActions || [],
+            opportunities: data.opportunities || [],
             mitigationPlan: data.mitigationPlan || "Akan ditentukan",
             proposedAction: data.proposedAction || [], // <-- Diubah menjadi array kosong jika tidak ada
             opportunity: data.opportunity || [],       // <-- Diubah menjadi array kosong jika tidak ada
@@ -112,14 +115,23 @@ export async function POST(request: Request) {
             monitoring: data.monitoring || "",
             pic: data.pic || data.riskOwner,
             status: data.status || 'Open',
-
+            relatedStandards: data.relatedStandards || [], // Pastikan field ini diproses
             // Timestamps
             createdAt: new Date(),
             updatedAt: new Date(),
-            history: [{ date: new Date().toISOString(), action: "Risiko dibuat", user: "Admin System" }],
+            history: [{ date: new Date(), action: "Risiko Dibuat", user: "Admin System" }], // Riwayat awal
+            deleted: false, // Tambahkan field untuk soft delete
+
         };
 
         const result = await db.collection('risks').insertOne(newRisk);
+        const insertedData = await db.collection('risks').findOne({_id: result.insertedId});
+
+        // --- LOGGING BARU: Catat ke log terpusat ---
+        if (insertedData) {
+            await logActivity('CREATE', 'Risiko', `Membuat risiko baru: '${insertedData.name}'`, { documentId: insertedData._id, data });
+        }
+
         return NextResponse.json(result, { status: 201 });
     } catch (error) {
         return NextResponse.json({ message: 'Gagal membuat risiko', error: (error as Error).message }, { status: 500 });

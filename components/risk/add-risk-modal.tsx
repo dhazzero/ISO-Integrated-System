@@ -36,22 +36,61 @@ export function AddRiskModal({ onRiskAdded }: { onRiskAdded: () => void }) {
   };
   const [formData, setFormData] = useState(initialFormData);
   const [availableStandards, setAvailableStandards] = useState<StandardOption[]>([]);
+  const [isLoadingStandards, setIsLoadingStandards] = useState(false); // State loading baru
 
-
+  // --- PENYEMPURNAAN useEffect ---
   useEffect(() => {
     if (open) {
-      const fetchStandards = async () => { /* ... (fungsi dari sebelumnya, tidak berubah) ... */ };
+      const fetchStandards = async () => {
+        setIsLoadingStandards(true); // Mulai loading
+        try {
+          const response = await fetch('/api/settings/standards', { cache: 'no-store' });
+          if (!response.ok) {
+            throw new Error('Gagal memuat daftar standar');
+          }
+          const data = await response.json();
+          setAvailableStandards(data);
+        } catch (error) {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: (error as Error).message,
+          });
+          setAvailableStandards([]); // Kosongkan jika error
+        } finally {
+          setIsLoadingStandards(false); // Selesai loading
+        }
+      };
       fetchStandards();
     }
   }, [open, toast]);
+  // -------------------------------
 
-  const handleInputChange = (field: keyof typeof formData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (field: keyof typeof initialFormData, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value })); };
+
+  // --- FUNGSI BARU UNTUK MENGHANDLE PERUBAHAN CHECKBOX STANDAR ---
+  const handleStandardChange = (standardName: string, checked: boolean | 'indeterminate') => {
+    const isChecked = typeof checked === 'boolean' ? checked : false;
+    const currentStandards = formData.relatedStandards || [];
+    let newStandards: string[];
+
+    if (isChecked) {
+      newStandards = [...currentStandards, standardName];
+    } else {
+      newStandards = currentStandards.filter(name => name !== standardName);
+    }
+    handleInputChange("relatedStandards", newStandards);
   };
+  // ----------------------------------------------------------------
 
+  // Versi yang Sudah Diperbaiki
   const handleDynamicListChange = (listName: 'controls' | 'mitigationActions' | 'opportunities', index: number, field: string, value: string) => {
+    // 1. Buat salinan (copy) dari array yang ada di state
     const updatedList = [...formData[listName]];
+    // 2. Buat objek baru untuk item yang diubah
     updatedList[index] = { ...updatedList[index], [field]: value };
+    // 3. Set state dengan array baru yang berisi objek baru
     handleInputChange(listName, updatedList);
   };
 
@@ -112,6 +151,39 @@ export function AddRiskModal({ onRiskAdded }: { onRiskAdded: () => void }) {
                 <div className="grid md:grid-cols-2 gap-4"><div className="space-y-2"><Label>Ancaman (Threat)</Label><Input value={formData.threat} onChange={(e) => handleInputChange("threat", e.target.value)} /></div><div className="space-y-2"><Label>Kelemahan (Vulnerability)</Label><Input value={formData.vulnerability} onChange={(e) => handleInputChange("vulnerability", e.target.value)} /></div></div>
                 <div className="space-y-2"><Label>Uraian Dampak Risiko</Label><Textarea value={formData.impactDescription} onChange={(e) => handleInputChange("impactDescription", e.target.value)} /></div>
                 <div className="grid md:grid-cols-2 gap-4"><div className="space-y-2"><Label>Kategori *</Label><Select value={formData.category} onValueChange={(v) => handleInputChange("category", v)}><SelectTrigger><SelectValue placeholder="Pilih Kategori"/></SelectTrigger><SelectContent>{categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label>Risk Owner *</Label><Input value={formData.riskOwner} onChange={(e) => handleInputChange("riskOwner", e.target.value)} required/></div></div>
+              </CardContent>
+            </Card>
+
+            {/* ... Card 1: Identifikasi Risiko tidak berubah ... */}
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Standar Terkait</CardTitle>
+                <CardDescription>Pilih standard ISO yang relevan dengan risiko ini.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 max-h-40 overflow-y-auto border p-4 rounded-md">
+                  {/* --- LOGIKA TAMPILAN BARU --- */}
+                  {isLoadingStandards ? (
+                      <p className="text-sm text-muted-foreground">Memuat standar...</p>
+                  ) : availableStandards.length > 0 ? (
+                      availableStandards.map((standard) => (
+                          <div key={standard._id} className="flex items-center space-x-2">
+                            <Checkbox
+                                id={`std-add-${standard._id}`}
+                                checked={formData.relatedStandards.includes(standard.name)}
+                                onCheckedChange={(checked) => handleStandardChange(standard.name, checked)}
+                            />
+                            <Label htmlFor={`std-add-${standard._id}`}>{standard.name}</Label>
+                          </div>
+                      ))
+                  ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Tidak ada standar yang ditemukan. Silakan tambahkan di menu Pengaturan.
+                      </p>
+                  )}
+                  {/* ----------------------------- */}
+                </div>
               </CardContent>
             </Card>
 

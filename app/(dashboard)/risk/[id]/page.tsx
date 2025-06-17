@@ -25,6 +25,7 @@ interface RiskDetail {
   category: string;
   riskOwner: string;
   status: string;
+  relatedStandards?: string[];
   inherentRisk: {
     likelihood: string;
     impact: string;
@@ -64,7 +65,6 @@ export default function RiskDetailPage() {
   const params = useParams();
   const riskId = params.id as string;
   const { toast } = useToast();
-
   const [risk, setRisk] = useState<RiskDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -96,10 +96,9 @@ export default function RiskDetailPage() {
 
   const getLevelColor = (level?: string) => {
     switch (level) {
-      case "Sangat Tinggi": return "bg-purple-100 text-purple-800";
+      case "Ekstrim": return "bg-red-700 text-white";
       case "Tinggi": return "bg-red-100 text-red-800";
       case "Sedang": return "bg-amber-100 text-amber-800";
-      case "Rendah-Sedang": return "bg-yellow-100 text-yellow-800";
       case "Rendah": return "bg-green-100 text-green-800";
       default: return "bg-gray-100 text-gray-800";
     }
@@ -178,6 +177,19 @@ export default function RiskDetailPage() {
                 <div className="space-y-1 pt-4 border-t mt-4"><p className="text-sm font-medium text-muted-foreground">Uraian Dampak</p><p className="text-sm">{risk.impactDescription || risk.description}</p></div>
 
                 {/* --- TAMBAHKAN BLOK INI --- */}
+                <div className="space-y-2 pt-4 border-t mt-4">
+                  <p className="text-sm font-medium text-muted-foreground">Standar Terkait</p>
+                  <div className="flex flex-wrap gap-2">
+                    {(risk.relatedStandards && risk.relatedStandards.length > 0) ? (
+                        risk.relatedStandards.map(std => (
+                            <Badge key={std} variant="secondary">{std}</Badge>
+                        ))
+                    ) : (
+                        <p className="text-sm text-muted-foreground">-</p>
+                    )}
+                  </div>
+                </div>
+
                 <div className="pt-4 border-t mt-4">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="flex items-center space-x-2">
@@ -211,7 +223,14 @@ export default function RiskDetailPage() {
                   <div className="flex justify-between items-center"><span className="text-sm font-medium text-muted-foreground">Kemungkinan</span><Badge variant="outline">{risk.inherentRisk?.likelihood} (Skor: {risk.inherentRisk?.likelihoodScore})</Badge></div>
                   <div className="flex justify-between items-center"><span className="text-sm font-medium text-muted-foreground">Dampak</span><Badge variant="outline">{risk.inherentRisk?.impact} (Skor: {risk.inherentRisk?.impactScore})</Badge></div>
                   <Separator />
-                  <div className="flex justify-between items-center"><span className="font-medium">Level Risiko</span><Badge className={getLevelColor(risk.inherentRisk?.level)}>{risk.inherentRisk?.level}</Badge></div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-muted-foreground">Risk Score</span>
+                    <span className="text-xl font-bold">{risk.inherentRisk?.score}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-muted-foreground">Level Risiko</span>
+                    <Badge className={getLevelColor(risk.inherentRisk?.level)}>{risk.inherentRisk?.level}</Badge>
+                  </div>
                 </CardContent>
               </Card>
               <Card>
@@ -220,7 +239,15 @@ export default function RiskDetailPage() {
                   <div className="flex justify-between items-center"><span className="text-sm font-medium text-muted-foreground">Kemungkinan</span><Badge variant="outline">{risk.residualRisk?.likelihood} (Skor: {risk.residualRisk?.likelihoodScore})</Badge></div>
                   <div className="flex justify-between items-center"><span className="text-sm font-medium text-muted-foreground">Dampak</span><Badge variant="outline">{risk.residualRisk?.impact} (Skor: {risk.residualRisk?.impactScore})</Badge></div>
                   <Separator />
-                  <div className="flex justify-between items-center"><span className="font-medium">Level Risiko</span><Badge className={getLevelColor(risk.residualRisk?.level)}>{risk.residualRisk?.level}</Badge></div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-muted-foreground">Risk Score</span>
+                    <span className="text-xl font-bold">{risk.residualRisk?.score}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-muted-foreground">Level Risiko</span>
+                    <Badge className={getLevelColor(risk.residualRisk?.level)}>{risk.residualRisk?.level}</Badge>
+                  </div>
+
                 </CardContent>
               </Card>
             </div>
