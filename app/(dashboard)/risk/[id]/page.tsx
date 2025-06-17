@@ -12,6 +12,7 @@ import { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 
 // --- Tipe Data Lengkap untuk Detail Risiko ---
+
 interface RiskDetail {
   _id: string;
   name: string;
@@ -43,8 +44,8 @@ interface RiskDetail {
   };
   controls: { description: string; type: string; }[];
   mitigationActions: { action: string; responsible: string; dueDate: string; }[];
-  proposedAction: string;
-  opportunity: string;
+  proposedAction:  string[];
+  opportunity:  string[];
   targetDate?: string;
   monitoring: string;
   pic: string;
@@ -81,7 +82,7 @@ export default function RiskDetailPage() {
       } finally {
         setIsLoading(false);
       }
-    };
+    };RiskFormData
 
     fetchRiskDetail();
   }, [riskId, toast]);
@@ -183,26 +184,87 @@ export default function RiskDetailPage() {
               </Card>
             </div>
           </TabsContent>
-
           <TabsContent value="mitigation">
-            <Card>
-              <CardHeader><CardTitle>Kontrol & Mitigasi</CardTitle><CardDescription>Detail kontrol yang ada dan tindakan mitigasi yang direncanakan.</CardDescription></CardHeader>
-              <CardContent className="space-y-6">
-                <div><h4 className="font-semibold mb-2">Aktivitas Kontrol Saat Ini</h4><p className="text-sm text-muted-foreground p-3 bg-muted rounded-md min-h-[60px]">{risk.controlActivities || "Tidak ada"}</p></div>
-                <div><h4 className="font-semibold mb-2">Usulan Tindakan Mitigasi</h4><p className="text-sm text-muted-foreground p-3 bg-muted rounded-md min-h-[60px]">{risk.proposedAction || "Tidak ada"}</p></div>
-              </CardContent>
-            </Card>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Aktivitas Kontrol yang Diterapkan</CardTitle>
+                  <CardDescription>Daftar kontrol yang sudah ada untuk memitigasi risiko ini.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {(risk.controls && risk.controls.length > 0) ? (
+                      <ul className="space-y-3">
+                        {(risk.controls).map((control, index) => (
+                            <li key={index} className="flex items-start text-sm p-3 bg-muted/50 rounded-md">
+                              <Shield className="h-4 w-4 mr-3 mt-1 flex-shrink-0 text-blue-500" />
+                              <div>
+                                <p className="font-medium">{control.description}</p>
+                                <Badge variant="outline" className="mt-1">{control.type}</Badge>
+                              </div>
+                            </li>
+                        ))}
+                      </ul>
+                  ) : (<p className="text-sm text-muted-foreground">Tidak ada kontrol yang ditambahkan.</p>)}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tindakan Mitigasi yang Direncanakan</CardTitle>
+                  <CardDescription>Rencana aksi spesifik untuk mengurangi level risiko.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {(risk.mitigationActions && risk.mitigationActions.length > 0) ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                          <tr className="border-b">
+                            <th className="p-2 text-left font-medium">Tindakan</th>
+                            <th className="p-2 text-left font-medium">PIC</th>
+                            <th className="p-2 text-left font-medium">Target Selesai</th>
+                          </tr>
+                          </thead>
+                          <tbody>
+                          {(risk.mitigationActions).map((mitigation, index) => (
+                              <tr key={index} className="border-b last:border-b-0">
+                                <td className="p-2">{mitigation.action}</td>
+                                <td className="p-2">{mitigation.responsible}</td>
+                                <td className="p-2">{new Date(mitigation.dueDate).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+                              </tr>
+                          ))}
+                          </tbody>
+                        </table>
+                      </div>
+                  ) : (<p className="text-sm text-muted-foreground">Tidak ada tindakan mitigasi yang ditambahkan.</p>)}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="actionplan">
             <Card>
-              <CardHeader><CardTitle>Rencana Aksi</CardTitle><CardDescription>Detail implementasi dan monitoring tindakan.</CardDescription></CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground flex items-center"><Target className="w-4 h-4 mr-1"/> Target Selesai</p><p>{risk.targetDate ? new Date(risk.targetDate).toLocaleDateString('id-ID') : "-"}</p></div>
+              <CardHeader><CardTitle>Rencana Aksi Detail</CardTitle></CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Usulan Tindakan</h4>
+                  {(risk.proposedAction && risk.proposedAction.length > 0) ? (
+                      <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                        {risk.proposedAction.map((action, index) => <li key={index}>{action}</li>)}
+                      </ul>
+                  ) : <p className="text-sm text-muted-foreground">Tidak ada.</p>}
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Peluang</h4>
+                  {(risk.opportunity && risk.opportunity.length > 0) ? (
+                      <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                        {risk.opportunity.map((opp, index) => <li key={index}>{opp}</li>)}
+                      </ul>
+                  ) : <p className="text-sm text-muted-foreground">Tidak ada.</p>}
+                </div>
+                <Separator/>
+                <div className="grid md:grid-cols-3 gap-4">
                   <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground flex items-center"><User className="w-4 h-4 mr-1"/> PIC</p><p>{risk.pic}</p></div>
-                  <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground flex items-center"><Activity className="w-4 h-4 mr-1"/> Frekuensi Monitoring</p><Badge variant="outline">{risk.monitoring}</Badge></div>
-                  <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground flex items-center"><Gift className="w-4 h-4 mr-1"/> Peluang</p><p>{risk.opportunity || "-"}</p></div>
+                  <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground flex items-center"><Target className="w-4 h-4 mr-1"/> Target Selesai</p><p>{risk.targetDate ? new Date(risk.targetDate).toLocaleDateString('id-ID') : '-'}</p></div>
+                  <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground flex items-center"><Eye className="w-4 h-4 mr-1"/> Frekuensi Monitoring</p><Badge variant="outline">{risk.monitoring}</Badge></div>
                 </div>
               </CardContent>
             </Card>

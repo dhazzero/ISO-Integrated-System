@@ -9,7 +9,7 @@ import { useState, useMemo, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { logActivity } from "@/lib/logger"
-import { Badge } from "@/components/ui/badge" // <-- Pastikan Badge di-import
+import { Badge } from "@/components/ui/badge"
 
 interface Risk {
   _id: string;
@@ -42,15 +42,17 @@ export default function RiskPage() {
     }
   };
 
-  useEffect(() => { fetchRisks(); }, []);
+  useEffect(() => {
+    fetchRisks();
+  }, []);
 
   const riskSummary = useMemo(() => {
     const summary: Record<string, number> = { "Tinggi": 0, "Sedang": 0, "Rendah": 0 };
     risks.forEach((risk) => {
-      const levelKey = risk.level.includes("Tinggi") ? "Tinggi" : risk.level.includes("Sedang") ? "Sedang" : "Rendah";
-      if (summary.hasOwnProperty(levelKey)) {
-        summary[levelKey]++;
-      }
+      // Mengelompokkan semua level risiko ke dalam 3 kategori besar untuk ringkasan
+      if (risk.level?.includes("Tinggi")) summary.Tinggi++;
+      else if (risk.level?.includes("Sedang")) summary.Sedang++;
+      else summary.Rendah++;
     });
     return [
       { level: "Tinggi", count: summary.Tinggi, color: "bg-red-500" },
@@ -59,39 +61,53 @@ export default function RiskPage() {
     ];
   }, [risks]);
 
-  const handleRiskAdded = () => { fetchRisks(); };
-  const handleDeleteClick = (risk: Risk) => setDeleteConfirm({ open: true, id: risk._id, name: risk.name });
-  const confirmDelete = async () => { /* ... (fungsi dari sebelumnya, tidak berubah) ... */ };
-  const getTrendIcon = (trend: string) => { /* ... (fungsi dari sebelumnya, tidak berubah) ... */ };
-  const getLevelColor = (level: string) => { /* ... (fungsi dari sebelumnya, tidak berubah) ... */ };
+  const handleRiskAdded = () => {
+    toast({ title: "Sukses", description: "Daftar risiko sedang diperbarui..."});
+    fetchRisks();
+  };
 
-  // --- FUNGSI BARU UNTUK MENAMPILKAN STATUS DENGAN BENAR ---
-  const getStatusBadge = (status: string) => {
-    let text: string;
-    let style: string;
+  const handleDeleteClick = (risk: Risk) => {
+    setDeleteConfirm({ open: true, id: risk._id, name: risk.name });
+  };
 
-    switch (status) {
-      case "Open":
-        text = "Terbuka";
-        style = "bg-red-100 text-red-800";
-        break;
-      case "Mitigated":
-        text = "Dimitigasi";
-        style = "bg-blue-100 text-blue-800";
-        break;
-      case "Closed":
-        text = "Ditutup";
-        style = "bg-green-100 text-green-800";
-        break;
-      case "Under Review":
-        text = "Dalam Tinjauan";
-        style = "bg-yellow-100 text-yellow-800";
-        break;
-      default:
-        text = status;
-        style = "bg-gray-100 text-gray-800";
+  const confirmDelete = async () => {
+    if (!deleteConfirm.id) return;
+    try {
+      const response = await fetch(`/api/risks/${deleteConfirm.id}`, { method: 'DELETE' });
+      if (!response.ok) { const err = await response.json(); throw new Error(err.message); }
+      await logActivity('DELETE', 'Risiko', `Menghapus risiko: ${deleteConfirm.name}`);
+      toast({ title: "Berhasil!", description: `Risiko "${deleteConfirm.name}" berhasil dihapus.` });
+      fetchRisks();
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: (error as Error).message });
+    } finally {
+      setDeleteConfirm({ open: false, id: null, name: "" });
     }
-    return <Badge className={style}>{text}</Badge>;
+  };
+
+  const getTrendIcon = (trend: string) => {
+    switch (trend) {
+      case "up": return <ArrowUpRight className="h-4 w-4 text-red-500" />;
+      case "down": return <ArrowDownRight className="h-4 w-4 text-green-500" />;
+      default: return <ArrowRight className="h-4 w-4 text-amber-500" />;
+    }
+  };
+
+  const getLevelColor = (level?: string) => {
+    if (!level) return "text-gray-500";
+    if (level.includes("Tinggi")) return "text-red-500";
+    if (level.includes("Sedang")) return "text-amber-500";
+    return "text-green-500";
+  };
+
+  const getStatusBadge = (status?: string) => {
+    switch (status) {
+      case "Open": return <Badge className="bg-red-100 text-red-800">Terbuka</Badge>;
+      case "Mitigated": return <Badge className="bg-blue-100 text-blue-800">Dimitigasi</Badge>;
+      case "Closed": return <Badge className="bg-green-100 text-green-800">Ditutup</Badge>;
+      case "Under Review": return <Badge className="bg-yellow-100 text-yellow-800">Dalam Tinjauan</Badge>;
+      default: return <Badge variant="secondary">{status}</Badge>;
+    }
   };
 
   return (
@@ -131,10 +147,7 @@ export default function RiskPage() {
                           <td className={`py-3 px-4 font-semibold ${getLevelColor(risk.level)}`}>{risk.level}</td>
                           <td className="py-3 px-4">{risk.likelihood}</td>
                           <td className="py-3 px-4">{risk.impact}</td>
-                          <td className="py-3 px-4">
-                            {/* --- PERBAIKAN DI SINI: Memanggil fungsi baru --- */}
-                            {getStatusBadge(risk.status)}
-                          </td>
+                          <td className="py-3 px-4">{getStatusBadge(risk.status)}</td>
                           <td className="py-3 px-4">{getTrendIcon(risk.trend)}</td>
                           <td className="py-3 px-4">
                             <div className="flex space-x-1">
@@ -152,8 +165,7 @@ export default function RiskPage() {
           </CardContent>
         </Card>
 
-        {/* ... Dialog Konfirmasi Hapus ... */}
-        <Dialog open={deleteConfirm.open} onOpenChange={(open) => setDeleteConfirm({ ...deleteConfirm, open })}>{/* ... */}</Dialog>
+        <Dialog open={deleteConfirm.open} onOpenChange={(open) => setDeleteConfirm({ ...deleteConfirm, open })}><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>Konfirmasi Penghapusan</DialogTitle><DialogDescription>Apakah Anda yakin ingin menghapus risiko <b>{deleteConfirm.name}</b>? Tindakan ini tidak dapat dibatalkan.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => setDeleteConfirm({ open: false, id: null, name: "" })}>Batal</Button><Button variant="destructive" onClick={confirmDelete} disabled={isLoading}>{isLoading ? "Menghapus..." : "Hapus"}</Button></DialogFooter></DialogContent></Dialog>
       </div>
   )
 }
