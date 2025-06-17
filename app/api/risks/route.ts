@@ -27,7 +27,9 @@ export async function POST(request: Request) {
         }
 
         // Fungsi helper untuk kalkulasi di backend
-        const getRiskDetails = (likelihoodScore: number, impactScore: number) => {
+        /*
+        // Fungsi helper untuk kalkulasi di backend rumus lama
+            const getRiskDetails = (likelihoodScore: number, impactScore: number) => {
             const levelMap = ["", "Rendah", "Rendah-Sedang", "Sedang", "Tinggi", "Sangat Tinggi"];
             const score = likelihoodScore * impactScore;
 
@@ -44,6 +46,40 @@ export async function POST(request: Request) {
 
             return { level, treatment, score, likelihood: levelMap[likelihoodScore], impact: levelMap[impactScore] };
         };
+*/
+        // Fungsi helper untuk kalkulasi di backend rumus sesuai Risk SOP IT
+        const getRiskDetails = (likelihoodScore: number, impactScore: number) => {
+            // Matriks Risiko sesuai gambar [baris: kemungkinan, kolom: dampak]
+            // Indeks 0 = Skor 1, Indeks 4 = Skor 5
+            const RISK_MATRIX = [
+                // Dampak:     1       2        3         4         5
+                /* L: 1 */ ["Rendah", "Rendah", "Rendah", "Sedang", "Sedang"],
+                /* L: 2 */ ["Rendah", "Rendah", "Sedang", "Sedang", "Tinggi"],
+                /* L: 3 */ ["Rendah", "Sedang", "Sedang", "Tinggi", "Tinggi"],
+                /* L: 4 */ ["Sedang", "Sedang", "Tinggi", "Tinggi", "Ekstrim"],
+                /* L: 5 */ ["Sedang", "Tinggi", "Tinggi", "Ekstrim", "Ekstrim"],
+            ];
+
+            const likelihoodMap = ["", "Sangat Jarang", "Jarang", "Mungkin", "Sering", "Sangat Sering"];
+            const impactMap = ["", "Sangat Rendah", "Rendah", "Sedang", "Tinggi", "Sangat Tinggi"];
+
+            // Pastikan skor berada dalam rentang yang valid (1-5)
+            const safeLikelihood = Math.max(1, Math.min(likelihoodScore, 5));
+            const safeImpact = Math.max(1, Math.min(impactScore, 5));
+
+            const level = RISK_MATRIX[safeLikelihood - 1][safeImpact - 1];
+
+            // Skor numerik tetap dihitung untuk referensi, jika diperlukan
+            const score = likelihoodScore * impactScore;
+
+            return {
+                level, // "Rendah", "Sedang", "Tinggi", "Ekstrim"
+                score,
+                likelihood: likelihoodMap[safeLikelihood],
+                impact: impactMap[safeImpact],
+            };
+        };
+
 
         const inherent = getRiskDetails(Number(data.inherentLikelihoodScore), Number(data.inherentImpactScore));
         const residual = getRiskDetails(Number(data.residualLikelihoodScore), Number(data.residualImpactScore));
@@ -68,7 +104,7 @@ export async function POST(request: Request) {
             impact: residual.impact,
 
             // Rencana Tindakan & Mitigasi
-            controlActivities: data.controlActivities || "",
+            controls: data.controls || [],
             mitigationPlan: data.mitigationPlan || "Akan ditentukan",
             proposedAction: data.proposedAction || [], // <-- Diubah menjadi array kosong jika tidak ada
             opportunity: data.opportunity || [],       // <-- Diubah menjadi array kosong jika tidak ada
