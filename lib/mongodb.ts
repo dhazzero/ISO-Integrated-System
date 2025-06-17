@@ -1,15 +1,10 @@
-// lib/mongodb.ts
 import { MongoClient, Db } from 'mongodb';
 
 const MONGODB_URI = "mongodb://localhost:27017";
 const DATABASE_NAME = "isoIntegratedSystemDB";
 
 if (!MONGODB_URI) {
-    throw new Error('Please define the MONGODB_URI environment variable inside .env.local or your environment variables');
-}
-
-if (!DATABASE_NAME) {
-    throw new Error('Please define the DATABASE_NAME environment variable inside .env.local or your environment variables');
+    throw new Error('Pastikan variabel MONGODB_URI sudah terisi dengan benar');
 }
 
 let cachedClient: MongoClient | null = null;
@@ -24,24 +19,14 @@ export async function connectToDatabase(): Promise<{ client: MongoClient, db: Db
 
     try {
         await client.connect();
-        console.log("Successfully connected to MongoDB.");
         const db = client.db(DATABASE_NAME);
-
+        console.log("✅ Berhasil terhubung ke MongoDB.");
         cachedClient = client;
         cachedDb = db;
-
         return { client, db };
     } catch (error) {
-        console.error("Failed to connect to MongoDB:", error);
-        await client.close(); // Pastikan client ditutup jika koneksi gagal
-        throw error;
+        console.error("❌ GAGAL TERHUBUNG KE DATABASE:", error);
+        await client.close();
+        throw new Error("Tidak dapat terhubung ke server MongoDB. Pastikan server MongoDB Anda sedang berjalan.");
     }
 }
-
-// Panggil fungsi connectToDatabase saat aplikasi dimulai (jika diperlukan untuk inisialisasi awal)
-// atau biarkan koneksi dibuat on-demand saat API dipanggil.
-// Untuk pengembangan, memanggilnya di sini bisa membantu memastikan konfigurasi benar.
-connectToDatabase().catch(console.error);
-
-export default connectToDatabase; // Anda bisa export default jika lebih suka
-
