@@ -3,15 +3,18 @@ import { connectToDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 const FINDINGS_COLLECTION = 'findings';
+const AUDITS_COLLECTION = 'audits';
 
-// GET: Mengambil satu finding berdasarkan ID
 export async function GET(request: Request, { params }: { params: { id: string } }) {
     try {
         const { db } = await connectToDatabase();
-        if (!ObjectId.isValid(params.id)) {
-            return NextResponse.json({ message: 'ID Finding tidak valid' }, { status: 400 });
+
+        const { id } = params;
+        if (!id || !ObjectId.isValid(id)) {
+            return NextResponse.json({ message: 'ID Finding tidak valid atau tidak ada' }, { status: 400 });
         }
-        const finding = await db.collection(FINDINGS_COLLECTION).findOne({ _id: new ObjectId(params.id) });
+
+        const finding = await db.collection(FINDINGS_COLLECTION).findOne({ _id: new ObjectId(id) });
         if (!finding) {
             return NextResponse.json({ message: 'Finding tidak ditemukan' }, { status: 404 });
         }
@@ -21,26 +24,43 @@ export async function GET(request: Request, { params }: { params: { id: string }
     }
 }
 
-// PUT: Memperbarui satu finding berdasarkan ID
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
     try {
         const { db } = await connectToDatabase();
-        if (!ObjectId.isValid(params.id)) {
+        const { id } = params;
+        if (!id || !ObjectId.isValid(id)) {
             return NextResponse.json({ message: 'ID Finding tidak valid' }, { status: 400 });
         }
+
         const data = await request.json();
         delete data._id;
 
-        const result = await db.collection(FINDINGS_COLLECTION).findOneAndUpdate(
-            { _id: new ObjectId(params.id) },
+        const updateResult = await db.collection(FINDINGS_COLLECTION).findOneAndUpdate(
+            { _id: new ObjectId(id) },
             { $set: { ...data, updatedAt: new Date() } },
             { returnDocument: 'after' }
         );
 
-        if (!result) {
+        if (!updateResult) {
             return NextResponse.json({ message: 'Finding tidak ditemukan untuk diperbarui' }, { status: 404 });
         }
-        return NextResponse.json(result, { status: 200 });
+
+        // Logika otomatisasi penyelesaian audit
+        if (updateResult.status === 'Closed' && updateResult.auditId) {
+            const openFindingsCount = await db.collection(FINDINGS_COLLECTION).countDocuments({
+                auditId: updateResult.auditId,
+                status: { $in: ['Open', 'In Progress'] }
+            });
+
+            if (openFindingsCount === 0) {
+                await db.collection(AUDITS_COLLECTION).updateOne(
+                    { _id: new ObjectId(updateResult.auditId) },
+                    { $set: { status: 'Completed', completedDate: new Date().toISOString() } }
+                );
+            }
+        }
+
+        return NextResponse.json(updateResult, { status: 200 });
     } catch (error) {
         return NextResponse.json({ message: 'Gagal memperbarui finding', error: (error as Error).message }, { status: 500 });
     }

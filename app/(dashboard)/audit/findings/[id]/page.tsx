@@ -1,27 +1,17 @@
 "use client"
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Edit } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/components/ui/use-toast";
 
-// Definisikan tipe data di sini
 interface Finding {
-    _id: string;
-    auditName: string;
-    findingType: string;
-    severity: string;
-    description: string;
-    clause: string;
-    evidence: string;
-    recommendation: string;
-    department: string;
-    status: string;
-    dueDate: string;
-    responsiblePerson: string;
+    _id: string; auditName: string; findingType: string; severity: string;
+    description: string; clause: string; evidence: string; recommendation: string;
+    department: string; status: string; dueDate: string; responsiblePerson: string;
 }
 
 export default function FindingDetailPage() {
@@ -67,11 +57,11 @@ export default function FindingDetailPage() {
                     <p><strong>Rekomendasi:</strong> {finding.recommendation}</p>
                     <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                         <p><strong>Tingkat:</strong> {finding.severity}</p>
-                        <p><strong>Klausul:</strong> {finding.clause}</p> {/* <-- TAMBAHKAN BARIS INI */}
+                        <p><strong>Klausul:</strong> {finding.clause}</p>
                         <p><strong>Departemen:</strong> {finding.department}</p>
                         <p><strong>Penanggung Jawab:</strong> {finding.responsiblePerson}</p>
                         <p><strong>Status:</strong> {finding.status}</p>
-                        <p><strong>Target Selesai:</strong> {new Date(finding.dueDate).toLocaleDateString()}</p>
+                        <p><strong>Target Selesai:</strong> {finding.dueDate ? new Date(finding.dueDate).toLocaleDateString() : '-'}</p>
                     </div>
                 </CardContent>
             </Card>

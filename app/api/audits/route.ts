@@ -1,15 +1,19 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
 
+const FINDINGS_COLLECTION = 'findings';
 const AUDITS_COLLECTION = 'audits';
 
-/**
- * Handles GET requests to fetch all audit schedules.
- */
+// GET: Mengambil satu finding berdasarkan ID
 export async function GET() {
     try {
         const { db } = await connectToDatabase();
         const audits = await db.collection(AUDITS_COLLECTION).find({}).sort({ date: -1 }).toArray();
+        if (!audits) {
+            console.warn(`Peringatan: Tidak ada data ditemukan di koleksi '${AUDITS_COLLECTION}'.`);
+            return NextResponse.json([]); // Kembalikan array kosong jika tidak ada data
+        }
         return NextResponse.json(audits, { status: 200 });
     } catch (error) {
         console.error("API GET /api/audits FAILED:", error);
@@ -17,34 +21,47 @@ export async function GET() {
     }
 }
 
-/**
- * Handles POST requests to create a new audit schedule.
- */
-export async function POST(request: Request) {
-    try {
-        const data = await request.json();
 
-        // Validasi data dasar
-        if (!data.name || !data.standard || !data.date || !data.auditType) {
-            return NextResponse.json({ message: 'Data tidak lengkap. Field wajib: Nama, Standar, Tanggal, Jenis Audit.' }, { status: 400 });
+// PUT: Memperbarui satu finding berdasarkan ID
+export async function PUT(request: Request, { params }: { params: { id: string } }) {
+    try {
+        const { db } = await connectToDatabase();
+        if (!ObjectId.isValid(params.id)) {
+            return NextResponse.json({ message: 'ID Finding tidak valid' }, { status: 400 });
+        }
+        const data = await request.json();
+        const findingId = new ObjectId(params.id);
+
+        // Update finding yang diubah
+        const updateResult = await db.collection(FINDINGS_COLLECTION).findOneAndUpdate(
+            { _id: findingId },
+            { $set: { ...data, updatedAt: new Date() } },
+            { returnDocument: 'after' }
+        );
+
+        if (!updateResult) {
+            return NextResponse.json({ message: 'Finding tidak ditemukan untuk diperbarui' }, { status: 404 });
         }
 
-        const { db } = await connectToDatabase();
+        const updatedFinding = updateResult;
 
-        const newAudit = {
-            ...data,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        };
+        // Logika Otomatisasi Penyelesaian Audit
+        if (updatedFinding.status === 'Closed' && updatedFinding.auditId) {
+            const openFindingsCount = await db.collection(FINDINGS_COLLECTION).countDocuments({
+                auditId: updatedFinding.auditId,
+                status: { $in: ['Open', 'In Progress'] }
+            });
 
-        const result = await db.collection(AUDITS_COLLECTION).insertOne(newAudit);
+            if (openFindingsCount === 0) {
+                await db.collection(AUDITS_COLLECTION).updateOne(
+                    { _id: new ObjectId(updatedFinding.auditId) },
+                    { $set: { status: 'Completed', completedDate: new Date().toISOString() } }
+                );
+            }
+        }
 
-        // Langsung kembalikan dokumen yang baru dibuat
-        return NextResponse.json({ ...newAudit, _id: result.insertedId }, { status: 201 });
-
+        return NextResponse.json(updatedFinding, { status: 200 });
     } catch (error) {
-        console.error("API POST /api/audits FAILED:", error);
-        // Pastikan respons error selalu dalam format JSON
-        return NextResponse.json({ message: 'Gagal membuat jadwal audit.', error: (error as Error).message }, { status: 500 });
+        return NextResponse.json({ message: 'Gagal memperbarui finding', error: (error as Error).message }, { status: 500 });
     }
 }
