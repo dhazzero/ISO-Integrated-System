@@ -70,8 +70,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
             // Menyimpan data array yang baru
             controls: data.controls || [],
             mitigationActions: data.mitigationActions || [],
-            proposedAction: data.proposedAction,
-            opportunity: data.opportunity,
+            proposedAction: data.proposedAction || [], // <-- Diubah menjadi array kosong jika tidak ada
+            opportunity: data.opportunity || [],       // <-- Diubah menjadi array kosong jika tidak ada
             targetDate: data.targetDate,
             monitoring: data.monitoring,
             pic: data.pic,

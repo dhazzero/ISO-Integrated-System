@@ -7,9 +7,16 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Plus } from "lucide-react"
-import { useState, FormEvent } from "react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Plus, Trash2 } from "lucide-react"
+import { useState, useEffect, FormEvent } from "react"
 import { useToast } from "@/components/ui/use-toast"
+
+// Tipe data untuk form
+interface Control { description: string; type: string; }
+interface Mitigation { action: string; responsible: string; dueDate: string; }
+interface Opportunity { description: string; }
+interface StandardOption { _id: string; name: string; }
 
 export function AddRiskModal({ onRiskAdded }: { onRiskAdded: () => void }) {
   const [open, setOpen] = useState(false);
@@ -19,15 +26,53 @@ export function AddRiskModal({ onRiskAdded }: { onRiskAdded: () => void }) {
   const initialFormData = {
     name: "", asset: "", threat: "", vulnerability: "", impactDescription: "",
     category: "", riskOwner: "", pic: "",
-    inherentLikelihoodScore: "0", inherentImpactScore: "0",
-    residualLikelihoodScore: "0", residualImpactScore: "0",
-    controlActivities: "", proposedAction: "", opportunity: "",
-    targetDate: "", monitoring: "", status: "Open",
+    inherentLikelihoodScore: "1", inherentImpactScore: "1",
+    residualLikelihoodScore: "1", residualImpactScore: "1",
+    proposedAction: "", targetDate: "", monitoring: "Monthly", status: "Open",
+    relatedStandards: [] as string[],
+    controls: [] as Control[],
+    mitigationActions: [] as Mitigation[],
+    opportunities: [] as Opportunity[], // Added for dynamic opportunities
   };
   const [formData, setFormData] = useState(initialFormData);
+  const [availableStandards, setAvailableStandards] = useState<StandardOption[]>([]);
 
-  const handleInputChange = (field: keyof typeof formData, value: string) => {
+  useEffect(() => {
+    if (open) {
+      const fetchStandards = async () => { /* ... (fungsi dari sebelumnya, tidak berubah) ... */ };
+      fetchStandards();
+    }
+  }, [open, toast]);
+
+  const handleInputChange = (field: keyof typeof formData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleDynamicListChange = (listName: 'controls' | 'mitigationActions' | 'opportunities', index: number, field: string, value: string) => {
+    const updatedList = [...formData[listName]];
+    updatedList[index] = { ...updatedList[index], [field]: value };
+    handleInputChange(listName, updatedList);
+  };
+
+  const addListItem = (listName: 'controls' | 'mitigationActions' | 'opportunities') => {
+    const list = formData[listName];
+    if (list.length >= 5) {
+      toast({ variant: "destructive", title: "Batas Maksimal", description: `Anda hanya bisa menambahkan maksimal 5 item.`});
+      return;
+    }
+    let newItem: Control | Mitigation | Opportunity;
+    if (listName === 'controls') {
+      newItem = { description: '', type: 'Preventif' };
+    } else if (listName === 'mitigationActions') {
+      newItem = { action: '', responsible: '', dueDate: '' };
+    } else { // opportunities
+      newItem = { description: '' };
+    }
+    handleInputChange(listName, [...list, newItem]);
+  };
+
+  const removeListItem = (listName: 'controls' | 'mitigationActions' | 'opportunities', index: number) => {
+    handleInputChange(listName, formData[listName].filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -49,6 +94,7 @@ export function AddRiskModal({ onRiskAdded }: { onRiskAdded: () => void }) {
 
   const scoreOptions = ["1", "2", "3", "4", "5"];
   const categories = ["Keamanan Informasi", "Operasional", "Kepatuhan", "Teknologi", "K3", "Keuangan", "Reputasi"];
+  const monitoringOptions = ["Daily", "Weekly", "Monthly", "Quarterly", "Semester", "Yearly"];
   const statuses = ["Open", "In Progress", "Mitigated", "Closed"];
 
   return (
@@ -85,17 +131,57 @@ export function AddRiskModal({ onRiskAdded }: { onRiskAdded: () => void }) {
             </Card>
 
             <Card>
-              <CardHeader><CardTitle>3. Rencana Tindakan & Mitigasi</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2"><Label>Aktivitas Kontrol Saat Ini</Label><Textarea value={formData.controlActivities} onChange={(e) => handleInputChange("controlActivities", e.target.value)} /></div>
-                <div className="space-y-2"><Label>Usulan Tindakan Mitigasi</Label><Textarea value={formData.proposedAction} onChange={(e) => handleInputChange("proposedAction", e.target.value)} /></div>
-                <div className="space-y-2"><Label>Peluang (Opportunity)</Label><Textarea value={formData.opportunity} onChange={(e) => handleInputChange("opportunity", e.target.value)} /></div>
-                <div className="space-y-2"><Label>Monitoring</Label><Textarea value={formData.monitoring} onChange={(e) => handleInputChange("monitoring", e.target.value)} /></div>
-                <div className="grid md:grid-cols-3 gap-4">
-                  <div className="space-y-2"><Label>Target Penyelesaian</Label><Input type="date" value={formData.targetDate} onChange={(e) => handleInputChange("targetDate", e.target.value)} /></div>
-                  <div className="space-y-2"><Label>PIC</Label><Input value={formData.pic} onChange={(e) => handleInputChange("pic", e.target.value)} /></div>
-                  <div className="space-y-2"><Label>Status</Label><Select value={formData.status} onValueChange={(v) => handleInputChange("status", v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{statuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+              <CardHeader><CardTitle>3. Kontrol & Mitigasi</CardTitle></CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <Label className="font-semibold">Aktivitas Kontrol Saat Ini</Label>
+                  <div className="mt-2 space-y-4">
+                    {(formData.controls).map((control, index) => (
+                        <div key={index} className="flex items-end gap-2 border-b pb-4">
+                          <div className="flex-1 space-y-2"><Label htmlFor={`ctrl-desc-${index}`}>Deskripsi Kontrol #{index + 1}</Label><Textarea id={`ctrl-desc-${index}`} value={control.description} onChange={(e) => handleDynamicListChange('controls', index, 'description', e.target.value)} /></div>
+                          <div className="space-y-2"><Label htmlFor={`ctrl-type-${index}`}>Tipe</Label><Select value={control.type} onValueChange={(v) => handleDynamicListChange('controls', index, 'type', v)}><SelectTrigger id={`ctrl-type-${index}`} className="w-[150px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Preventif">Preventif</SelectItem><SelectItem value="Detektif">Detektif</SelectItem><SelectItem value="Korektif">Korektif</SelectItem></SelectContent></Select></div>
+                          <Button type="button" variant="outline" size="icon" onClick={() => removeListItem('controls', index)}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                    ))}
+                    <Button type="button" variant="outline" size="sm" onClick={() => addListItem('controls')} disabled={formData.controls.length >= 5}><Plus className="mr-2 h-4 w-4"/>Tambah Kontrol</Button>
+                  </div>
                 </div>
+                <div>
+                  <Label className="font-semibold">Tindakan Mitigasi yang Direncanakan</Label>
+                  <div className="mt-2 space-y-4">
+                    {(formData.mitigationActions).map((mitigation, index) => (
+                        <div key={index} className="flex items-end gap-2 border-b pb-4">
+                          <div className="flex-1 space-y-2"><Label htmlFor={`mit-action-${index}`}>Tindakan #{index + 1}</Label><Textarea id={`mit-action-${index}`} value={mitigation.action} onChange={(e) => handleDynamicListChange('mitigationActions', index, 'action', e.target.value)} /></div>
+                          <div className="space-y-2"><Label htmlFor={`mit-resp-${index}`}>PIC</Label><Input id={`mit-resp-${index}`} value={mitigation.responsible} onChange={(e) => handleDynamicListChange('mitigationActions', index, 'responsible', e.target.value)} /></div>
+                          <div className="space-y-2"><Label htmlFor={`mit-date-${index}`}>Target</Label><Input id={`mit-date-${index}`} type="date" value={mitigation.dueDate} onChange={(e) => handleDynamicListChange('mitigationActions', index, 'dueDate', e.target.value)} /></div>
+                          <Button type="button" variant="outline" size="icon" onClick={() => removeListItem('mitigationActions', index)}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                    ))}
+                    <Button type="button" variant="outline" size="sm" onClick={() => addListItem('mitigationActions')} disabled={formData.mitigationActions.length >= 5}><Plus className="mr-2 h-4 w-4"/>Tambah Mitigasi</Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle>4. Rencana Aksi Lainnya</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="font-semibold">Peluang (Opportunity)</Label>
+                  <div className="mt-2 space-y-4">
+                    {(formData.opportunities).map((opportunity, index) => (
+                        <div key={index} className="flex items-end gap-2 border-b pb-4">
+                          <div className="flex-1 space-y-2"><Label htmlFor={`opp-desc-${index}`}>Deskripsi Peluang #{index + 1}</Label><Textarea id={`opp-desc-${index}`} value={opportunity.description} onChange={(e) => handleDynamicListChange('opportunities', index, 'description', e.target.value)} /></div>
+                          <Button type="button" variant="outline" size="icon" onClick={() => removeListItem('opportunities', index)}><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                    ))}
+                    <Button type="button" variant="outline" size="sm" onClick={() => addListItem('opportunities')} disabled={formData.opportunities.length >= 5}><Plus className="mr-2 h-4 w-4"/>Tambah Peluang</Button>
+                  </div>
+                </div>
+                <div className="space-y-2"><Label>Monitoring</Label><Select value={formData.monitoring} onValueChange={(v) => handleInputChange("monitoring", v)}><SelectTrigger><SelectValue placeholder="Pilih frekuensi monitoring"/></SelectTrigger><SelectContent>{monitoringOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-2"><Label>Target Penyelesaian</Label><Input type="date" value={formData.targetDate} onChange={(e) => handleInputChange("targetDate", e.target.value)} /></div>
+                <div className="space-y-2"><Label>PIC</Label><Input value={formData.pic} onChange={(e) => handleInputChange("pic", e.target.value)} /></div>
+                <div className="space-y-2"><Label>Status</Label><Select value={formData.status} onValueChange={(v) => handleInputChange("status", v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{statuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
               </CardContent>
             </Card>
 
@@ -105,3 +191,5 @@ export function AddRiskModal({ onRiskAdded }: { onRiskAdded: () => void }) {
       </Dialog>
   );
 }
+
+

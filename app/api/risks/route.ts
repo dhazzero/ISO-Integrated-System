@@ -70,8 +70,8 @@ export async function POST(request: Request) {
             // Rencana Tindakan & Mitigasi
             controlActivities: data.controlActivities || "",
             mitigationPlan: data.mitigationPlan || "Akan ditentukan",
-            proposedAction: data.proposedAction || "",
-            opportunity: data.opportunity || "",
+            proposedAction: data.proposedAction || [], // <-- Diubah menjadi array kosong jika tidak ada
+            opportunity: data.opportunity || [],       // <-- Diubah menjadi array kosong jika tidak ada
             targetDate: data.targetDate || null,
             monitoring: data.monitoring || "",
             pic: data.pic || data.riskOwner,
