@@ -1,18 +1,19 @@
 "use client"
 
+export const dynamic = 'force-dynamic'
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
-import { Edit, ArrowLeft, Calendar, User, Shield, Activity, Clock, Target, Gift, Eye } from "lucide-react"
+import { Edit, ArrowLeft, Calendar, User, Shield, Clock, Target, Eye, FileText  } from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useState, useEffect } from "react"
 import { useToast } from "@/components/ui/use-toast"
 
-// --- Tipe Data Lengkap untuk Detail Risiko ---
-
+// Tipe Data Lengkap untuk Detail Risiko
 interface RiskDetail {
   _id: string;
   name: string;
@@ -42,14 +43,19 @@ interface RiskDetail {
     likelihoodScore?: number;
     impactScore?: number;
   };
-  controls: { description: string; type: string; }[];
+  controls: { description: string; type: string; status: string; }[];
   mitigationActions: { action: string; responsible: string; dueDate: string; }[];
-  proposedAction:  string[];
-  opportunity:  string[];
+  opportunities: { description: string }[];
   targetDate?: string;
   monitoring: string;
   pic: string;
-  history: { date: string; action: string; user: string; }[];
+  history:
+      {
+    date: string;
+    action: string;
+    user: string;
+    details?: string[];
+      }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -82,9 +88,10 @@ export default function RiskDetailPage() {
       } finally {
         setIsLoading(false);
       }
-    };RiskFormData
+    };
 
-    fetchRiskDetail();
+    fetchRiskDetail(); // <--- Pastikan baris ini bersih tanpa tambahan apapun
+
   }, [riskId, toast]);
 
   const getLevelColor = (level?: string) => {
@@ -107,7 +114,18 @@ export default function RiskDetailPage() {
       default: return "bg-gray-100 text-gray-800";
     }
   };
-
+  const getControlStatusBadge = (status?: string) => {
+    switch (status) {
+      case "Diterapkan":
+        return <Badge className="bg-green-100 text-green-800">Diterapkan</Badge>;
+      case "Sebagian":
+        return <Badge className="bg-yellow-100 text-yellow-800">Sebagian</Badge>;
+      case "Belum Diterapkan":
+        return <Badge className="bg-red-100 text-red-800">Belum</Badge>;
+      default:
+        return <Badge variant="secondary">{status || 'N/A'}</Badge>;
+    }
+  };
   if (isLoading) {
     return <div className="container mx-auto p-6 text-center">Memuat detail risiko...</div>;
   }
@@ -158,6 +176,29 @@ export default function RiskDetailPage() {
                   <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground">Kategori</p><p>{risk.category}</p></div>
                 </div>
                 <div className="space-y-1 pt-4 border-t mt-4"><p className="text-sm font-medium text-muted-foreground">Uraian Dampak</p><p className="text-sm">{risk.impactDescription || risk.description}</p></div>
+
+                {/* --- TAMBAHKAN BLOK INI --- */}
+                <div className="pt-4 border-t mt-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">Dibuat</p>
+                        <p className="text-sm text-muted-foreground">{new Date(risk.createdAt).toLocaleDateString('id-ID')}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">Diperbarui</p>
+                        <p className="text-sm text-muted-foreground">{new Date(risk.updatedAt).toLocaleDateString('id-ID')}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {/* ------------------------- */}
+
+
               </CardContent>
             </Card>
           </TabsContent>
@@ -193,17 +234,34 @@ export default function RiskDetailPage() {
                 </CardHeader>
                 <CardContent>
                   {(risk.controls && risk.controls.length > 0) ? (
-                      <ul className="space-y-3">
-                        {(risk.controls).map((control, index) => (
-                            <li key={index} className="flex items-start text-sm p-3 bg-muted/50 rounded-md">
-                              <Shield className="h-4 w-4 mr-3 mt-1 flex-shrink-0 text-blue-500" />
-                              <div>
-                                <p className="font-medium">{control.description}</p>
-                                <Badge variant="outline" className="mt-1">{control.type}</Badge>
-                              </div>
-                            </li>
-                        ))}
-                      </ul>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                          <tr className="border-b">
+                            <th className="p-2 text-left font-medium">Deskripsi Kontrol</th>
+                            <th className="p-2 text-left font-medium">Tipe</th>
+                            <th className="p-2 text-left font-medium">Status</th>
+                          </tr>
+                          </thead>
+                          <tbody>
+                          {(risk.controls).map((control, index) => (
+                              <tr key={index} className="border-b last:border-b-0">
+                                <td className="p-2 flex items-start">
+                                  <Shield className="h-4 w-4 mr-3 mt-1 flex-shrink-0 text-blue-500" />
+                                  {control.description}
+                                </td>
+                                <td className="p-2">
+                                  <Badge variant="outline">{control.type}</Badge>
+                                </td>
+                                <td className="p-2">
+                                  {getControlStatusBadge(control.status)}
+                                </td>
+                              </tr>
+                          ))}
+                          </tbody>
+                        </table>
+                      </div>
                   ) : (<p className="text-sm text-muted-foreground">Tidak ada kontrol yang ditambahkan.</p>)}
                 </CardContent>
               </Card>
@@ -245,18 +303,10 @@ export default function RiskDetailPage() {
               <CardHeader><CardTitle>Rencana Aksi Detail</CardTitle></CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <h4 className="text-sm font-medium mb-2">Usulan Tindakan</h4>
-                  {(risk.proposedAction && risk.proposedAction.length > 0) ? (
+                  <h4 className="text-sm font-medium mb-2">Peluang (Opportunity)</h4>
+                  {(risk.opportunities && risk.opportunities.length > 0) ? (
                       <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                        {risk.proposedAction.map((action, index) => <li key={index}>{action}</li>)}
-                      </ul>
-                  ) : <p className="text-sm text-muted-foreground">Tidak ada.</p>}
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium mb-2">Peluang</h4>
-                  {(risk.opportunity && risk.opportunity.length > 0) ? (
-                      <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                        {risk.opportunity.map((opp, index) => <li key={index}>{opp}</li>)}
+                        {risk.opportunities.map((opp, index) => <li key={index}>{opp.description}</li>)}
                       </ul>
                   ) : <p className="text-sm text-muted-foreground">Tidak ada.</p>}
                 </div>
@@ -275,12 +325,24 @@ export default function RiskDetailPage() {
               <CardHeader><CardTitle>Riwayat Perubahan</CardTitle><CardDescription>Log aktivitas dan perubahan pada risiko ini</CardDescription></CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {(risk.history || []).map((entry, index) => (
+                  {(risk.history || []).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((entry, index) => (
+                      // --- PERBARUI TAMPILAN LOG DI SINI ---
                       <div key={index} className="flex items-start space-x-3 pb-4 border-b last:border-b-0">
-                        <div className="flex-shrink-0"><Clock className="h-5 w-5 text-muted-foreground" /></div>
+                        <div className="flex-shrink-0 pt-1">
+                                            <span className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                                                <Clock className="h-4 w-4 text-muted-foreground" />
+                                            </span>
+                        </div>
                         <div className="flex-1">
-                          <p className="text-sm">{entry.action} oleh <b>{entry.user}</b></p>
-                          <div className="text-xs text-muted-foreground">{new Date(entry.date).toLocaleString('id-ID')}</div>
+                          <p className="text-sm font-medium">{entry.action} oleh <b>{entry.user}</b></p>
+                          <div className="text-xs text-muted-foreground mb-2">{new Date(entry.date).toLocaleString('id-ID')}</div>
+                          {entry.details && entry.details.length > 0 && (
+                              <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                                {entry.details.map((detail, detailIndex) => (
+                                    <li key={detailIndex}>{detail}</li>
+                                ))}
+                              </ul>
+                          )}
                         </div>
                       </div>
                   ))}

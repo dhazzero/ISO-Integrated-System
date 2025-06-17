@@ -13,7 +13,7 @@ import { useState, useEffect, FormEvent } from "react"
 import { useToast } from "@/components/ui/use-toast"
 
 // Tipe data untuk form
-interface Control { description: string; type: string; }
+interface Control { description: string; type: string; status: string; }
 interface Mitigation { action: string; responsible: string; dueDate: string; }
 interface Opportunity { description: string; }
 interface StandardOption { _id: string; name: string; }
@@ -36,6 +36,7 @@ export function AddRiskModal({ onRiskAdded }: { onRiskAdded: () => void }) {
   };
   const [formData, setFormData] = useState(initialFormData);
   const [availableStandards, setAvailableStandards] = useState<StandardOption[]>([]);
+
 
   useEffect(() => {
     if (open) {
@@ -62,7 +63,7 @@ export function AddRiskModal({ onRiskAdded }: { onRiskAdded: () => void }) {
     }
     let newItem: Control | Mitigation | Opportunity;
     if (listName === 'controls') {
-      newItem = { description: '', type: 'Preventif' };
+      newItem = { description: '', type: 'Preventif', status: 'Diterapkan' };
     } else if (listName === 'mitigationActions') {
       newItem = { action: '', responsible: '', dueDate: '' };
     } else { // opportunities
@@ -137,12 +138,37 @@ export function AddRiskModal({ onRiskAdded }: { onRiskAdded: () => void }) {
                   <Label className="font-semibold">Aktivitas Kontrol Saat Ini</Label>
                   <div className="mt-2 space-y-4">
                     {(formData.controls).map((control, index) => (
-                        <div key={index} className="flex items-end gap-2 border-b pb-4">
-                          <div className="flex-1 space-y-2"><Label htmlFor={`ctrl-desc-${index}`}>Deskripsi Kontrol #{index + 1}</Label><Textarea id={`ctrl-desc-${index}`} value={control.description} onChange={(e) => handleDynamicListChange('controls', index, 'description', e.target.value)} /></div>
-                          <div className="space-y-2"><Label htmlFor={`ctrl-type-${index}`}>Tipe</Label><Select value={control.type} onValueChange={(v) => handleDynamicListChange('controls', index, 'type', v)}><SelectTrigger id={`ctrl-type-${index}`} className="w-[150px]"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Preventif">Preventif</SelectItem><SelectItem value="Detektif">Detektif</SelectItem><SelectItem value="Korektif">Korektif</SelectItem></SelectContent></Select></div>
+                        <div key={index} className="flex flex-col md:flex-row items-end gap-2 border-b pb-4">
+                          <div className="flex-1 space-y-2">
+                            <Label htmlFor={`ctrl-desc-${index}`}>Deskripsi Kontrol #{index + 1}</Label>
+                            <Textarea id={`ctrl-desc-${index}`} value={control.description} onChange={(e) => handleDynamicListChange('controls', index, 'description', e.target.value)} />
+                          </div>
+                          <div className="flex gap-2 w-full md:w-auto">
+                            <div className="space-y-2 flex-1">
+                              <Label htmlFor={`ctrl-type-${index}`}>Tipe</Label>
+                              <Select value={control.type} onValueChange={(v) => handleDynamicListChange('controls', index, 'type', v)}>
+                                <SelectTrigger id={`ctrl-type-${index}`}><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Preventif">Preventif</SelectItem>
+                                  <SelectItem value="Detektif">Detektif</SelectItem>
+                                  <SelectItem value="Korektif">Korektif</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2 flex-1">
+                              <Label htmlFor={`ctrl-status-${index}`}>Status</Label>
+                              <Select value={control.status} onValueChange={(v) => handleDynamicListChange('controls', index, 'status', v)}>
+                                <SelectTrigger id={`ctrl-status-${index}`}><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Diterapkan">Diterapkan</SelectItem>
+                                  <SelectItem value="Sebagian">Sebagian</SelectItem>
+                                  <SelectItem value="Belum Diterapkan">Belum</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
                           <Button type="button" variant="outline" size="icon" onClick={() => removeListItem('controls', index)}><Trash2 className="h-4 w-4" /></Button>
-                        </div>
-                    ))}
+                        </div>                    ))}
                     <Button type="button" variant="outline" size="sm" onClick={() => addListItem('controls')} disabled={formData.controls.length >= 5}><Plus className="mr-2 h-4 w-4"/>Tambah Kontrol</Button>
                   </div>
                 </div>

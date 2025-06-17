@@ -10,6 +10,8 @@ import { useToast } from "@/components/ui/use-toast"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { logActivity } from "@/lib/logger"
 import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+
 
 interface Risk {
   _id: string;
@@ -20,6 +22,8 @@ interface Risk {
   impact: string;
   status: string;
   trend: string;
+  relatedStandards?: string[]; // Tambahkan properti ini
+
 }
 
 export default function RiskPage() {
@@ -111,6 +115,7 @@ export default function RiskPage() {
   };
 
   return (
+      <TooltipProvider> {/* <-- TAMBAHKAN WRAPPER INI */}
       <div className="container mx-auto px-4 py-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Manajemen Risiko</h1>
@@ -133,7 +138,9 @@ export default function RiskPage() {
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead><tr className="border-b"><th className="text-left py-3 px-4">Nama Risiko</th><th className="text-left py-3 px-4">Kategori</th><th className="text-left py-3 px-4">Level</th><th className="text-left py-3 px-4">Kemungkinan</th><th className="text-left py-3 px-4">Dampak</th><th className="text-left py-3 px-4">Status</th><th className="text-left py-3 px-4">Tren</th><th className="text-left py-3 px-4">Tindakan</th></tr></thead>
+                {/* --- PERBARUI HEADER TABEL --- */}
+                <thead><tr className="border-b"><th className="text-left py-3 px-4">Nama Risiko</th><th className="text-left py-3 px-4">Standar Terkait</th><th className="text-left py-3 px-4">Level</th><th className="text-left py-3 px-4">Kemungkinan</th><th className="text-left py-3 px-4">Dampak</th><th className="text-left py-3 px-4">Status</th><th className="text-left py-3 px-4">Tindakan</th></tr></thead>
+                {/* ----------------------------- */}
                 <tbody>
                 {isLoading ? (
                     <tr><td colSpan={8} className="text-center p-8">Memuat data risiko...</td></tr>
@@ -143,12 +150,43 @@ export default function RiskPage() {
                     risks.map((risk) => (
                         <tr key={risk._id} className="border-b hover:bg-muted/50">
                           <td className="py-3 px-4 flex items-center"><AlertTriangle className={`mr-2 h-4 w-4 ${getLevelColor(risk.level)}`} /><Link href={`/risk/${risk._id}`} className="hover:underline">{risk.name}</Link></td>
-                          <td className="py-3 px-4">{risk.category}</td>
+
+                          {/* --- TAMBAHKAN CELL BARU INI --- */}
+                          <td className="py-3 px-4">
+                            <div className="flex flex-wrap items-center gap-1">
+                              {(risk.relatedStandards && risk.relatedStandards.length > 0) ? (
+                                  <>
+                                    {risk.relatedStandards.slice(0, 2).map(std => (
+                                        <Badge key={std} variant="secondary">{std}</Badge>
+                                    ))}
+                                    {risk.relatedStandards.length > 2 && (
+                                        <Tooltip>
+                                          <TooltipTrigger>
+                                            <Badge variant="outline">
+                                              +{risk.relatedStandards.length - 2} lagi...
+                                            </Badge>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <div className="flex flex-col gap-1 p-1">
+                                              {risk.relatedStandards.slice(2).map(std => (
+                                                  <span key={std} className="text-xs">{std}</span>
+                                              ))}
+                                            </div>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                    )}
+                                  </>
+                              ) : (
+                                  <span className="text-xs text-muted-foreground">-</span>
+                              )}
+                            </div>
+                          </td>
+                          {/* ------------------------------- */}
+
                           <td className={`py-3 px-4 font-semibold ${getLevelColor(risk.level)}`}>{risk.level}</td>
                           <td className="py-3 px-4">{risk.likelihood}</td>
                           <td className="py-3 px-4">{risk.impact}</td>
                           <td className="py-3 px-4">{getStatusBadge(risk.status)}</td>
-                          <td className="py-3 px-4">{getTrendIcon(risk.trend)}</td>
                           <td className="py-3 px-4">
                             <div className="flex space-x-1">
                               <Link href={`/risk/${risk._id}`}><Button variant="ghost" size="icon"><Eye className="h-4 w-4" /></Button></Link>
@@ -167,5 +205,6 @@ export default function RiskPage() {
 
         <Dialog open={deleteConfirm.open} onOpenChange={(open) => setDeleteConfirm({ ...deleteConfirm, open })}><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>Konfirmasi Penghapusan</DialogTitle><DialogDescription>Apakah Anda yakin ingin menghapus risiko <b>{deleteConfirm.name}</b>? Tindakan ini tidak dapat dibatalkan.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={() => setDeleteConfirm({ open: false, id: null, name: "" })}>Batal</Button><Button variant="destructive" onClick={confirmDelete} disabled={isLoading}>{isLoading ? "Menghapus..." : "Hapus"}</Button></DialogFooter></DialogContent></Dialog>
       </div>
+      </TooltipProvider>
   )
 }
