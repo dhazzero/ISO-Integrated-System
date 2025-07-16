@@ -3,11 +3,11 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb'; //
 import { GridFSBucket, ObjectId } from 'mongodb';
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: { id: string } }) {
     try {
+        const { id: fileIdString } = params;
         const { db } = await connectToDatabase(); //
         const bucket = new GridFSBucket(db, { bucketName: 'uploads' });
-        const fileIdString = params.id;
 
         if (!fileIdString || !ObjectId.isValid(fileIdString)) {
             return NextResponse.json({ message: 'Invalid file ID' }, { status: 400 });
@@ -24,7 +24,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
         const downloadStream = bucket.openDownloadStream(fileId);
 
-        const url = new URL(request.url);
+        const url = new URL(req.url);
         const inline = url.searchParams.get('inline') === '1' || url.searchParams.get('inline') === 'true';
 
         // Menggunakan ReadableStream untuk respons Next.js

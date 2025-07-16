@@ -7,10 +7,10 @@ import { ObjectId, GridFSBucket } from 'mongodb';
 const COLLECTION_NAME = 'documents';
 
 // === FUNGSI PUT YANG DIPERBAIKI (TANPA FORMIDABLE) ===
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: { params: { id: string } }) {
   try {
+    const { id } = params;
     const { db } = await connectToDatabase();
-    const id = params.id;
 
     if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json({ message: 'Invalid document id' }, { status: 400 });
@@ -18,7 +18,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     const _id = new ObjectId(id);
 
     // Membaca body request sebagai JSON, sesuai alur asli Anda
-    const updateData = await request.json();
+    const updateData = await req.json();
 
     // 1. Temukan dokumen yang ada untuk mendapatkan fileId lama
     const existingDoc = await db.collection(COLLECTION_NAME).findOne({ _id });
@@ -83,10 +83,10 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 }
 
 // Fungsi DELETE (biarkan seperti yang sudah ada, atau gunakan versi ini untuk konsistensi)
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   try {
+    const { id } = params;
     const { db } = await connectToDatabase();
-    const id = params.id;
     if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json({ message: 'Invalid document id' }, { status: 400 });
     }

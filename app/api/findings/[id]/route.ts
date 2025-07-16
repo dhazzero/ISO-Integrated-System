@@ -5,11 +5,10 @@ import { ObjectId } from 'mongodb';
 const FINDINGS_COLLECTION = 'findings';
 const AUDITS_COLLECTION = 'audits';
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: { id: string } }) {
     try {
-        const { db } = await connectToDatabase();
-
         const { id } = params;
+        const { db } = await connectToDatabase();
         if (!id || !ObjectId.isValid(id)) {
             return NextResponse.json({ message: 'ID Finding tidak valid atau tidak ada' }, { status: 400 });
         }
@@ -24,15 +23,15 @@ export async function GET(request: Request, { params }: { params: { id: string }
     }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, { params }: { params: { id: string } }) {
     try {
-        const { db } = await connectToDatabase();
         const { id } = params;
+        const { db } = await connectToDatabase();
         if (!id || !ObjectId.isValid(id)) {
             return NextResponse.json({ message: 'ID Finding tidak valid' }, { status: 400 });
         }
 
-        const data = await request.json();
+        const data = await req.json();
         delete data._id;
 
         const updateResult = await db.collection(FINDINGS_COLLECTION).findOneAndUpdate(
