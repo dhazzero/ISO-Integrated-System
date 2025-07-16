@@ -5,9 +5,10 @@ import { GridFSBucket, ObjectId } from 'mongodb';
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
     try {
+        const { id: fileIdString } = params;
         const { db } = await connectToDatabase(); //
         const bucket = new GridFSBucket(db, { bucketName: 'uploads' });
-        const fileIdString = params.id;
+
 
         if (!fileIdString || !ObjectId.isValid(fileIdString)) {
             return NextResponse.json({ message: 'Invalid file ID' }, { status: 400 });

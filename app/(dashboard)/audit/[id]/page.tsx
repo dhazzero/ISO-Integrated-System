@@ -25,7 +25,7 @@ export default function AuditDetailPage() {
     const [audit, setAudit] = useState<Audit | null>(null);
     const [findings, setFindings] = useState<Finding[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isCompleting, setIsCompleting] = useState(false);
+
 
     const fetchAuditData = async () => {
         if (!auditId) return;
@@ -54,34 +54,6 @@ export default function AuditDetailPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [auditId]);
 
-    const handleCompleteAudit = async () => {
-        if (!audit) return;
-
-        const openFindings = findings.filter(f => f.status === 'Open' || f.status === 'In Progress');
-        if (openFindings.length > 0) {
-            if (!confirm(`Audit ini masih memiliki ${openFindings.length} temuan yang terbuka. Anda yakin ingin menyelesaikannya?`)) {
-                return;
-            }
-        }
-
-        setIsCompleting(true);
-        try {
-            const response = await fetch(`/api/audits/${audit._id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'Completed', completedDate: new Date().toISOString() }),
-            });
-            if (!response.ok) throw new Error("Gagal memperbarui status audit.");
-
-            toast({ title: "Sukses", description: "Status audit telah diubah menjadi Selesai." });
-            fetchAuditData();
-            router.push('/audit'); // Kembali ke halaman utama
-        } catch (error) {
-            toast({ variant: "destructive", title: "Error", description: (error as Error).message });
-        } finally {
-            setIsCompleting(false);
-        }
-    };
 
     if (isLoading) return <div className="container p-6 text-center">Memuat detail audit...</div>;
     if (!audit) return <div className="container p-6 text-center text-red-500">Audit tidak ditemukan.</div>;
@@ -94,12 +66,6 @@ export default function AuditDetailPage() {
                     <div><h1 className="text-3xl font-bold">{audit.name}</h1></div>
                 </div>
                 <div className="flex items-center space-x-2">
-                    {audit.status === 'Scheduled' && (
-                        <Button onClick={handleCompleteAudit} disabled={isCompleting}>
-                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                            {isCompleting ? 'Menyelesaikan...' : 'Selesaikan Audit'}
-                        </Button>
-                    )}
                     <Link href={`/audit/${audit._id}/edit`}><Button variant="outline"><Edit className="mr-2 h-4 w-4" /> Edit</Button></Link>
                 </div>
             </div>
@@ -126,8 +92,21 @@ export default function AuditDetailPage() {
                 <TabsContent value="findings">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
-                            <div><CardTitle>Daftar Temuan</CardTitle><CardDescription>Semua temuan yang tercatat untuk audit ini.</CardDescription></div>
-                            <AddFindingModal onAddFinding={fetchAuditData} audits={[audit]} />
+                            <div>
+                                <CardTitle>Daftar Temuan</CardTitle>
+                                <CardDescription>Semua temuan yang tercatat untuk audit ini.</CardDescription>
+                            </div>
+                            <div className="flex space-x-2">
+                                {audit.status === 'Scheduled' && (
+                                    <Link href={`/audit/${audit._id}/finish`}>
+                                        <Button>
+                                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                                            Selesaikan Audit
+                                        </Button>
+                                    </Link>
+                                )}
+                                <AddFindingModal onAddFinding={fetchAuditData} audits={[audit]} />
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <table className="w-full">

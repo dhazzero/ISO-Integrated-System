@@ -7,14 +7,13 @@ const AUDITS_COLLECTION = 'audits';
 // GET: Mengambil satu audit berdasarkan ID
 export async function GET(request: Request, { params }: { params: { id: string } }) {
     try {
+        const { id } = params;
         const { db } = await connectToDatabase();
 
-        // --- PERBAIKAN DI SINI ---
-        const { id } = params;
+
         if (!id || !ObjectId.isValid(id)) {
             return NextResponse.json({ message: 'ID Audit tidak valid atau tidak ada' }, { status: 400 });
         }
-        // -------------------------
 
         const audit = await db.collection(AUDITS_COLLECTION).findOne({ _id: new ObjectId(id) });
         if (!audit) {
@@ -29,13 +28,13 @@ export async function GET(request: Request, { params }: { params: { id: string }
 // PUT: Memperbarui satu audit berdasarkan ID
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
     try {
-        const { db } = await connectToDatabase();
-        // --- PERBAIKAN DI SINI ---
+
         const { id } = params;
+        const { db } = await connectToDatabase();
         if (!id || !ObjectId.isValid(id)) {
             return NextResponse.json({ message: 'ID Audit tidak valid atau tidak ada' }, { status: 400 });
         }
-        // -------------------------
+
 
         const data = await request.json();
         delete data._id;
