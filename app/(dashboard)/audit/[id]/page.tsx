@@ -94,12 +94,6 @@ export default function AuditDetailPage() {
                     <div><h1 className="text-3xl font-bold">{audit.name}</h1></div>
                 </div>
                 <div className="flex items-center space-x-2">
-                    {audit.status === 'Scheduled' && (
-                        <Button onClick={handleCompleteAudit} disabled={isCompleting}>
-                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                            {isCompleting ? 'Menyelesaikan...' : 'Selesaikan Audit'}
-                        </Button>
-                    )}
                     <Link href={`/audit/${audit._id}/edit`}><Button variant="outline"><Edit className="mr-2 h-4 w-4" /> Edit</Button></Link>
                 </div>
             </div>
@@ -126,8 +120,19 @@ export default function AuditDetailPage() {
                 <TabsContent value="findings">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
-                            <div><CardTitle>Daftar Temuan</CardTitle><CardDescription>Semua temuan yang tercatat untuk audit ini.</CardDescription></div>
-                            <AddFindingModal onAddFinding={fetchAuditData} audits={[audit]} />
+                            <div>
+                                <CardTitle>Daftar Temuan</CardTitle>
+                                <CardDescription>Semua temuan yang tercatat untuk audit ini.</CardDescription>
+                            </div>
+                            <div className="flex space-x-2">
+                                {audit.status === 'Scheduled' && (
+                                    <Button onClick={handleCompleteAudit} disabled={isCompleting}>
+                                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                                        {isCompleting ? 'Menyelesaikan...' : 'Selesaikan Audit'}
+                                    </Button>
+                                )}
+                                <AddFindingModal onAddFinding={fetchAuditData} audits={[audit]} />
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <table className="w-full">
