@@ -11,6 +11,7 @@ import { useToast } from "@/components/ui/use-toast";
 // Definisikan tipe data di sini
 interface Finding {
     _id: string;
+    auditId: string;
     auditName: string;
     findingType: string;
     severity: string;
@@ -26,10 +27,27 @@ interface Finding {
 
 export default function FindingDetailPage() {
     const params = useParams();
+    const router = useRouter();
     const { toast } = useToast();
     const findingId = params.id as string;
     const [finding, setFinding] = useState<Finding | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+
+    const handleCompleteAudit = async () => {
+        if (!finding) return;
+        try {
+            const res = await fetch(`/api/audits/${finding.auditId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'Completed' })
+            });
+            if (!res.ok) throw new Error('Gagal menyelesaikan audit.');
+            toast({ title: 'Audit Diselesaikan', description: 'Status audit diperbarui.' });
+            router.push('/audit');
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: (error as Error).message });
+        }
+    };
 
     useEffect(() => {
         if (!findingId) return;
@@ -57,7 +75,10 @@ export default function FindingDetailPage() {
                     <Link href="/audit"><Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
                     <div><h1 className="text-3xl font-bold">Detail Temuan</h1><p className="text-muted-foreground">{finding.description.substring(0, 50)}...</p></div>
                 </div>
-                <Link href={`/audit/findings/${finding._id}/edit`}><Button><Edit className="mr-2 h-4 w-4" /> Edit</Button></Link>
+                <div className="flex space-x-2">
+                    <Link href={`/audit/findings/${finding._id}/edit`}><Button><Edit className="mr-2 h-4 w-4" /> Edit</Button></Link>
+                    <Button variant="outline" onClick={handleCompleteAudit}>Selesaikan Audit</Button>
+                </div>
             </div>
             <Card>
                 <CardHeader><CardTitle>{finding.findingType}: {finding.auditName}</CardTitle></CardHeader>
@@ -67,7 +88,7 @@ export default function FindingDetailPage() {
                     <p><strong>Rekomendasi:</strong> {finding.recommendation}</p>
                     <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                         <p><strong>Tingkat:</strong> {finding.severity}</p>
-                        <p><strong>Klausul:</strong> {finding.clause}</p> {/* <-- TAMBAHKAN BARIS INI */}
+                        <p><strong>Klausul:</strong> {finding.clause}</p>
                         <p><strong>Departemen:</strong> {finding.department}</p>
                         <p><strong>Penanggung Jawab:</strong> {finding.responsiblePerson}</p>
                         <p><strong>Status:</strong> {finding.status}</p>

@@ -54,6 +54,7 @@ export default function AuditPage() {
   const [findings, setFindings] = useState<Finding[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const [pendingAudit, setPendingAudit] = useState<string | null>(null);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -78,24 +79,55 @@ export default function AuditPage() {
     fetchData();
   }, []);
 
+  const normalizedStatus = (s: string) => s?.toLowerCase().trim();
+  const isCompletedStatus = (s: string) => {
+    const val = normalizedStatus(s);
+    return val === 'completed' || val === 'selesai';
+  };
+  const isScheduledStatus = (s: string) => {
+    const val = normalizedStatus(s);
+    return val === 'scheduled' || val === 'dijadwalkan';
+  };
+
   const auditSummary = [
     { title: "Audit Internal", count: audits.filter(a => a.auditType === 'Internal').length },
     { title: "Audit Eksternal", count: audits.filter(a => a.auditType === 'External').length },
-    { title: "Selesai", count: audits.filter(a => a.status === 'Completed').length },
+    { title: "Selesai", count: audits.filter(a => isCompletedStatus(a.status)).length },
     { title: "Total Finding", count: findings.length },
   ];
 
-  const handleDataAdded = () => {
+  const handleDataAdded = (auditId?: string) => {
     toast({ title: "Sukses!", description: "Data berhasil ditambahkan. Memuat ulang daftar..." });
+    if (auditId) setPendingAudit(auditId);
     fetchData();
   };
 
+  const handleCompleteAudit = async () => {
+    if (!pendingAudit) return;
+    try {
+      const res = await fetch(`/api/audits/${pendingAudit}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Completed' })
+      });
+      if (!res.ok) throw new Error('Gagal menyelesaikan audit.');
+      toast({ title: 'Audit Diselesaikan', description: 'Status audit diperbarui.' });
+      setPendingAudit(null);
+      fetchData();
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Error', description: (error as Error).message });
+    }
+  };
+
+
   const getStatusIcon = (status: string) => {
-    if (status === "Completed") return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+    if (isCompletedStatus(status))
+      return <CheckCircle2 className="h-4 w-4 text-green-500" />;
     return <Calendar className="h-4 w-4 text-blue-500" />;
   };
 
-  const getStatusText = (status: string) => status === "Completed" ? "Selesai" : "Dijadwalkan";
+  const getStatusText = (status: string) =>
+    isCompletedStatus(status) ? "Selesai" : "Dijadwalkan";
 
   const getSeverityColor = (severity: string) => {
     if (severity === "Critical") return "bg-red-600 text-white";
@@ -133,7 +165,6 @@ export default function AuditPage() {
                 <td className="p-4">{audit.standard}</td>
                 <td className="p-4">{new Date(audit.date).toLocaleDateString()}</td>
                 <td className="p-4"><div className="flex items-center">{getStatusIcon(audit.status)}<span className="ml-2">{getStatusText(audit.status)}</span></div></td>
-                {/* --- PERBAIKAN TOMBOL AKSI --- */}
                 <td className="p-4">
                   <div className="flex space-x-1">
                     <Link href={`/audit/${audit._id}`}><Button title="Lihat Detail" variant="ghost" size="icon"><Eye className="h-4 w-4" /></Button></Link>
@@ -168,13 +199,23 @@ export default function AuditPage() {
           <TabsContent value="all"><Card><CardHeader><CardTitle>Semua Jadwal Audit</CardTitle></CardHeader><CardContent>{isLoading ? <p className="text-center p-4">Memuat...</p> : <AuditTable auditList={audits} />}</CardContent></Card></TabsContent>
           <TabsContent value="internal"><Card><CardHeader><CardTitle>Audit Internal</CardTitle></CardHeader><CardContent>{isLoading ? <p className="text-center p-4">Memuat...</p> : <AuditTable auditList={audits.filter(a => a.auditType === 'Internal')} />}</CardContent></Card></TabsContent>
           <TabsContent value="external"><Card><CardHeader><CardTitle>Audit Eksternal</CardTitle></CardHeader><CardContent>{isLoading ? <p className="text-center p-4">Memuat...</p> : <AuditTable auditList={audits.filter(a => a.auditType === 'External')} />}</CardContent></Card></TabsContent>
-          <TabsContent value="scheduled"><Card><CardHeader><CardTitle>Audit Dijadwalkan</CardTitle></CardHeader><CardContent>{isLoading ? <p className="text-center p-4">Memuat...</p> : <AuditTable auditList={audits.filter(a => a.status === 'Scheduled')} />}</CardContent></Card></TabsContent>
-          <TabsContent value="completed"><Card><CardHeader><CardTitle>Audit Selesai</CardTitle></CardHeader><CardContent>{isLoading ? <p className="text-center p-4">Memuat...</p> : <AuditTable auditList={audits.filter(a => a.status === 'Completed')} />}</CardContent></Card></TabsContent>
+          <TabsContent value="scheduled"><Card><CardHeader><CardTitle>Audit Dijadwalkan</CardTitle></CardHeader><CardContent>{isLoading ? <p className="text-center p-4">Memuat...</p> : <AuditTable auditList={audits.filter(a => isScheduledStatus(a.status))} />}</CardContent></Card></TabsContent>
+          <TabsContent value="completed"><Card><CardHeader><CardTitle>Audit Selesai</CardTitle></CardHeader><CardContent>{isLoading ? <p className="text-center p-4">Memuat...</p> : <AuditTable auditList={audits.filter(a => isCompletedStatus(a.status))} />}</CardContent></Card></TabsContent>
           <TabsContent value="findings">
             <Card>
               <CardHeader className="pb-4 flex flex-row items-center justify-between">
-                <div><CardTitle>Finding Result</CardTitle><CardDescription>Daftar temuan dari semua audit.</CardDescription></div>
-                <AddFindingModal onAddFinding={handleDataAdded} audits={audits} />
+                <div>
+                  <CardTitle>Finding Result</CardTitle>
+                  <CardDescription>Daftar temuan dari semua audit.</CardDescription>
+                </div>
+                <div className="flex space-x-2">
+                  <AddFindingModal onAddFinding={handleDataAdded} audits={audits} />
+                  {pendingAudit && (
+                    <Button variant="outline" onClick={handleCompleteAudit}>
+                      Selesaikan Audit
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -197,7 +238,6 @@ export default function AuditPage() {
                           <td className="p-4 max-w-xs truncate" title={finding.description}>{finding.description}</td>
                           <td className="p-4"><Badge variant="outline">{finding.clause}</Badge></td>
                           <td className="p-4"><Badge className={getFindingStatusColor(finding.status)}>{finding.status}</Badge></td>
-                          {/* --- PERBAIKAN TOMBOL AKSI --- */}
                           <td className="p-4">
                             <div className="flex space-x-1">
                               <Link href={`/audit/findings/${finding._id}`}><Button title="Lihat Detail Finding" variant="ghost" size="icon"><Eye className="h-4 w-4" /></Button></Link>
