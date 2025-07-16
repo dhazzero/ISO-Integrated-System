@@ -75,7 +75,10 @@ export default function AuditDetailPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground">Nama Audit</p><p>{audit.name}</p></div>
                         <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground">Standar</p><p>{audit.standard}</p></div>
-                        <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground">Jenis Audit</p><p><Badge variant={audit.auditType === 'Internal' ? 'default' : 'secondary'}>{audit.auditType}</Badge></p></div>
+                        <div className="space-y-1">
+                            <p className="text-sm font-medium text-muted-foreground">Jenis Audit</p>
+                            <Badge variant={audit.auditType === 'Internal' ? 'default' : 'secondary'}>{audit.auditType}</Badge>
+                        </div>
                         <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground">Tanggal & Waktu</p><p className="flex items-center"><Calendar className="mr-2 h-4 w-4" />{new Date(audit.date).toLocaleDateString()} {audit.scheduledTime && `pukul ${audit.scheduledTime}`}</p></div>
                         <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground">Status</p><p>{audit.status}</p></div>
                         <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground">{audit.auditType === 'Internal' ? 'Departemen' : 'Lembaga'}</p><p className="flex items-center"><Building className="mr-2 h-4 w-4" />{audit.auditType === 'Internal' ? audit.department : audit.auditor}</p></div>
