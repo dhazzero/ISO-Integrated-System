@@ -32,7 +32,6 @@ interface DepartmentOption {
 }
 
 interface AddFindingModalProps {
-  onAddFinding: () => void;
   audits: AuditOption[];
 }
 
@@ -99,7 +98,7 @@ export function AddFindingModal({ onAddFinding, audits }: AddFindingModalProps) 
       if (!response.ok) throw new Error((await response.json()).message || 'Gagal menyimpan temuan.');
 
       toast({ title: "Sukses", description: "Temuan baru berhasil ditambahkan." });
-      onAddFinding();
+        onAddFinding(); // Panggil callback untuk memperbarui daftar temuan
       setFormData(initialFormState);
       setOpen(false);
     } catch (error) {
