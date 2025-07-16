@@ -9,8 +9,9 @@ const COLLECTION_NAME = 'documents';
 // === FUNGSI PUT YANG DIPERBAIKI (TANPA FORMIDABLE) ===
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
+    const { id } = params;
     const { db } = await connectToDatabase();
-    const id = params.id;
+
 
     if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json({ message: 'Invalid document id' }, { status: 400 });
@@ -85,8 +86,8 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 // Fungsi DELETE (biarkan seperti yang sudah ada, atau gunakan versi ini untuk konsistensi)
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
+    const { id } = params;
     const { db } = await connectToDatabase();
-    const id = params.id;
     if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json({ message: 'Invalid document id' }, { status: 400 });
     }
