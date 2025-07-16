@@ -7,9 +7,8 @@ const AUDITS_COLLECTION = 'audits';
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
     try {
-        const { db } = await connectToDatabase();
-
         const { id } = params;
+        const { db } = await connectToDatabase();
         if (!id || !ObjectId.isValid(id)) {
             return NextResponse.json({ message: 'ID Finding tidak valid atau tidak ada' }, { status: 400 });
         }
@@ -26,8 +25,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
     try {
-        const { db } = await connectToDatabase();
         const { id } = params;
+        const { db } = await connectToDatabase();
         if (!id || !ObjectId.isValid(id)) {
             return NextResponse.json({ message: 'ID Finding tidak valid' }, { status: 400 });
         }
