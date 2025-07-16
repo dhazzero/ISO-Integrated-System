@@ -135,7 +135,6 @@ export function AddFindingModal({ onAddFinding, audits }: AddFindingModalProps) 
 
             <div className="space-y-2"><Label htmlFor="description">Deskripsi Temuan *</Label><Textarea id="description" value={formData.description} onChange={e => handleInputChange("description", e.target.value)} required rows={3} placeholder="Jelaskan temuan secara detail..."/></div>
 
-            {/* --- FIELD YANG DIKEMBALIKAN --- */}
             <div className="space-y-2"><Label htmlFor="evidence">Bukti/Evidence</Label><Textarea id="evidence" value={formData.evidence} onChange={e => handleInputChange("evidence", e.target.value)} rows={3} placeholder="Jelaskan bukti yang mendukung temuan..."/></div>
             <div className="space-y-2"><Label htmlFor="recommendation">Rekomendasi</Label><Textarea id="recommendation" value={formData.recommendation} onChange={e => handleInputChange("recommendation", e.target.value)} rows={3} placeholder="Berikan rekomendasi perbaikan..."/></div>
 
