@@ -53,7 +53,6 @@ export default function AuditPage() {
   const [audits, setAudits] = useState<Audit[]>([]);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [completeAuditId, setCompleteAuditId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchData = async () => {
@@ -101,26 +100,6 @@ export default function AuditPage() {
     fetchData();
   };
 
-  const handleFindingAdded = (auditId: string) => {
-    setCompleteAuditId(auditId);
-    handleDataAdded();
-  };
-
-  const handleCompleteAudit = async (auditId: string) => {
-    try {
-      const res = await fetch(`/api/audits/${auditId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'Completed' })
-      });
-      if (!res.ok) throw new Error('Gagal menyelesaikan audit.');
-      toast({ title: 'Audit Diselesaikan', description: 'Status audit diperbarui.' });
-      setCompleteAuditId(null);
-      fetchData();
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Error', description: (error as Error).message });
-    }
-  };
 
   const getStatusIcon = (status: string) => {
     if (isCompletedStatus(status))
@@ -208,12 +187,7 @@ export default function AuditPage() {
             <Card>
               <CardHeader className="pb-4 flex flex-row items-center justify-between">
                 <div><CardTitle>Finding Result</CardTitle><CardDescription>Daftar temuan dari semua audit.</CardDescription></div>
-                <AddFindingModal onAddFinding={handleFindingAdded} audits={audits} />
-                {completeAuditId && (
-                  <Button onClick={() => handleCompleteAudit(completeAuditId)} className="ml-2">
-                    Selesaikan Audit
-                  </Button>
-                )}
+                <AddFindingModal onAddFinding={handleDataAdded} audits={audits} />
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
