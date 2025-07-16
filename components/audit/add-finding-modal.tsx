@@ -32,7 +32,7 @@ interface DepartmentOption {
 }
 
 interface AddFindingModalProps {
-  onAddFinding: () => void;
+  onAddFinding: (auditId: string) => void;
   audits: AuditOption[];
 }
 
@@ -98,10 +98,10 @@ export function AddFindingModal({ onAddFinding, audits }: AddFindingModalProps) 
       });
       if (!response.ok) throw new Error((await response.json()).message || 'Gagal menyimpan temuan.');
 
-      toast({ title: "Sukses", description: "Temuan baru berhasil ditambahkan." });
-      onAddFinding();
-      setFormData(initialFormState);
-      setOpen(false);
+    toast({ title: "Sukses", description: "Temuan baru berhasil ditambahkan." });
+    onAddFinding(formData.auditId);
+    setFormData(initialFormState);
+    setOpen(false);
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: (error as Error).message });
     } finally {
