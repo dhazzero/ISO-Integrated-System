@@ -88,7 +88,7 @@ export default function FindingDetailPage() {
                     <p><strong>Rekomendasi:</strong> {finding.recommendation}</p>
                     <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                         <p><strong>Tingkat:</strong> {finding.severity}</p>
-                        <p><strong>Klausul:</strong> {finding.clause}</p> {/* <-- TAMBAHKAN BARIS INI */}
+                        <p><strong>Klausul:</strong> {finding.clause}</p>
                         <p><strong>Departemen:</strong> {finding.department}</p>
                         <p><strong>Penanggung Jawab:</strong> {finding.responsiblePerson}</p>
                         <p><strong>Status:</strong> {finding.status}</p>

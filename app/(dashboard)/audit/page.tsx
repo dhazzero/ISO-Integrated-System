@@ -146,7 +146,6 @@ export default function AuditPage() {
                 <td className="p-4">{audit.standard}</td>
                 <td className="p-4">{new Date(audit.date).toLocaleDateString()}</td>
                 <td className="p-4"><div className="flex items-center">{getStatusIcon(audit.status)}<span className="ml-2">{getStatusText(audit.status)}</span></div></td>
-                {/* --- PERBAIKAN TOMBOL AKSI --- */}
                 <td className="p-4">
                   <div className="flex space-x-1">
                     <Link href={`/audit/${audit._id}`}><Button title="Lihat Detail" variant="ghost" size="icon"><Eye className="h-4 w-4" /></Button></Link>
@@ -210,7 +209,6 @@ export default function AuditPage() {
                           <td className="p-4 max-w-xs truncate" title={finding.description}>{finding.description}</td>
                           <td className="p-4"><Badge variant="outline">{finding.clause}</Badge></td>
                           <td className="p-4"><Badge className={getFindingStatusColor(finding.status)}>{finding.status}</Badge></td>
-                          {/* --- PERBAIKAN TOMBOL AKSI --- */}
                           <td className="p-4">
                             <div className="flex space-x-1">
                               <Link href={`/audit/findings/${finding._id}`}><Button title="Lihat Detail Finding" variant="ghost" size="icon"><Eye className="h-4 w-4" /></Button></Link>

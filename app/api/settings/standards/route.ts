@@ -4,7 +4,6 @@ import { connectToDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 
-// --- TAMBAHKAN BARIS INI UNTUK MENONAKTIFKAN CACHING ---
 export const dynamic = 'force-dynamic';
 const STANDARDS_COLLECTION = 'iso_standards';
 
