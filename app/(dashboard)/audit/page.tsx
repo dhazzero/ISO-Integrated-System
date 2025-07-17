@@ -136,19 +136,36 @@ export default function AuditPage() {
     const AuditTable = ({ auditList }: { auditList: Audit[] }) => (
         <div className="overflow-x-auto">
             <table className="w-full">
-                <thead><tr className="border-b"><th className="p-4 text-left font-medium">Nama Audit</th><th className="p-4 text-left font-medium">Jenis</th><th className="p-4 text-left font-medium">Status</th><th className="p-4 text-left font-medium">Aksi</th></tr></thead>
+                <thead>
+                    <tr className="border-b">
+                        <th className="p-4 text-left font-medium">Nama Audit</th>
+                        <th className="p-4 text-left font-medium">Standar</th>
+                        <th className="p-4 text-left font-medium">Departemen</th>
+                        <th className="p-4 text-left font-medium">Jenis Audit</th>
+                        <th className="p-4 text-left font-medium">Tanggal</th>
+                        <th className="p-4 text-left font-medium">Status</th>
+                        <th className="p-4 text-left font-medium">Temuan</th>
+                        <th className="p-4 text-left font-medium">Aksi</th>
+                    </tr>
+                </thead>
                 <tbody>
                 {auditList.length > 0 ? auditList.map((audit) => (
                     <tr key={audit._id} className="border-b hover:bg-muted/50">
                         <td className="p-4 flex items-center"><FileCheck className="mr-2 h-4 w-4 text-blue-500" />{audit.name}</td>
+                        <td className="p-4">{audit.standard}</td>
+                        <td className="p-4">{audit.department}</td>
                         <td className="p-4"><Badge variant={audit.auditType === 'Internal' ? 'default' : 'secondary'}>{audit.auditType}</Badge></td>
+                        <td className="p-4">{new Date(audit.date).toLocaleDateString()}</td>
                         <td className="p-4"><div className="flex items-center">{getStatusIcon(audit.status)}<span className="ml-2">{getStatusText(audit.status)}</span></div></td>
+                        <td className="p-4 text-center">{audit.findings}</td>
                         <td className="p-4"><div className="flex space-x-1">
                             <Link href={`/audit/${audit._id}`}><Button title="Lihat" variant="ghost" size="icon"><Eye className="h-4 w-4" /></Button></Link>
                             <Link href={`/audit/${audit._id}/edit`}><Button title="Edit" variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button></Link>
                         </div></td>
                     </tr>
-                )) : (<tr><td colSpan={4} className="p-4 text-center text-muted-foreground">Tidak ada data.</td></tr>)}
+                )) : (
+                    <tr><td colSpan={8} className="p-4 text-center text-muted-foreground">Tidak ada data.</td></tr>
+                )}
                 </tbody>
             </table>
         </div>
@@ -176,7 +193,78 @@ export default function AuditPage() {
                 <TabsContent value="internal"><Card><CardHeader><CardTitle>Audit Internal</CardTitle></CardHeader><CardContent>{isLoading ? <p className="text-center p-4">Memuat...</p> : <AuditTable auditList={audits.filter(a => a.auditType === 'Internal')} />}</CardContent></Card></TabsContent>
                 <TabsContent value="external"><Card><CardHeader><CardTitle>Audit Eksternal</CardTitle></CardHeader><CardContent>{isLoading ? <p className="text-center p-4">Memuat...</p> : <AuditTable auditList={audits.filter(a => a.auditType === 'External')} />}</CardContent></Card></TabsContent>
                 <TabsContent value="scheduled"><Card><CardHeader><CardTitle>Audit Dijadwalkan</CardTitle></CardHeader><CardContent>{isLoading ? <p className="text-center p-4">Memuat...</p> : <AuditTable auditList={audits.filter(a => isScheduledStatus(a.status))} />}</CardContent></Card></TabsContent>
-                <TabsContent value="completed"><Card><CardHeader><CardTitle>Audit Selesai</CardTitle></CardHeader><CardContent>{isLoading ? <p className="text-center p-4">Memuat...</p> : <AuditTable auditList={audits.filter(a => isCompletedStatus(a.status))} />}</CardContent></Card></TabsContent>
+                <TabsContent value="completed">
+                    <Card>
+                        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                            <div>
+                                <CardTitle>Audit Selesai</CardTitle>
+                                <CardDescription>Daftar audit yang telah selesai dilaksanakan</CardDescription>
+                            </div>
+                            <AddAuditModal onAddAudit={handleDataAdded} type="completed" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b">
+                                            <th className="text-left py-3 px-4">Nama Audit</th>
+                                            <th className="text-left py-3 px-4">Standar</th>
+                                            <th className="text-left py-3 px-4">Auditor</th>
+                                            <th className="text-left py-3 px-4">Tanggal Selesai</th>
+                                            <th className="text-left py-3 px-4">Temuan</th>
+                                            <th className="text-left py-3 px-4">Files</th>
+                                            <th className="text-left py-3 px-4">Laporan</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {audits.filter(a => isCompletedStatus(a.status)).map(audit => (
+                                            <tr key={audit._id} className="border-b hover:bg-muted/50">
+                                                <td className="py-3 px-4 flex items-center">
+                                                    <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" />
+                                                    {audit.name}
+                                                </td>
+                                                <td className="py-3 px-4">{audit.standard}</td>
+                                                <td className="py-3 px-4">{audit.auditor}</td>
+                                                <td className="py-3 px-4">{audit.completedDate ? audit.completedDate : '-'}</td>
+                                                <td className="py-3 px-4">
+                                                    {audit.findings && audit.findings > 0 ? (
+                                                        <Badge variant="destructive">{audit.findings} temuan</Badge>
+                                                    ) : (
+                                                        <Badge variant="secondary">Tidak ada</Badge>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <div className="flex flex-col space-y-1">
+                                                        {audit.reportFile && (
+                                                            <Button variant="ghost" size="sm" className="justify-start p-0 h-auto">
+                                                                <Download className="mr-1 h-3 w-3" />
+                                                                <span className="text-xs">{audit.reportFile}</span>
+                                                            </Button>
+                                                        )}
+                                                        {audit.evidenceFiles?.map((file, index) => (
+                                                            <Button key={index} variant="ghost" size="sm" className="justify-start p-0 h-auto">
+                                                                <Download className="mr-1 h-3 w-3" />
+                                                                <span className="text-xs">{file}</span>
+                                                            </Button>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <Link href={`/audit/${audit._id}/report`}>
+                                                        <Button variant="outline" size="sm">
+                                                            <FileText className="mr-2 h-4 w-4" />
+                                                            Lihat Laporan
+                                                        </Button>
+                                                    </Link>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
 
                 {/* --- KONTEN TAB FINDING RESULT DIKEMBALIKAN --- */}
                 <TabsContent value="findings">
