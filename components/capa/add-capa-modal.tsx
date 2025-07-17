@@ -24,7 +24,7 @@ interface AddCapaModalProps {
   isOpen: boolean
   onClose: () => void
   onAddCapa: (capa: any) => void
-  mode: "open" | "in-progress" | "closed"
+  mode: "open" | "in-progress" | "done" | "closed"
 }
 
 export default function AddCapaModal({ isOpen, onClose, onAddCapa, mode }: AddCapaModalProps) {
@@ -97,7 +97,14 @@ export default function AddCapaModal({ isOpen, onClose, onAddCapa, mode }: AddCa
       successCriteria: formData.successCriteria,
       verificationMethod: formData.verificationMethod,
       notes: formData.notes,
-      status: "Open",
+      status:
+          mode === "open"
+              ? "Open"
+              : mode === "in-progress"
+                  ? "In Progress"
+                  : mode === "done"
+                      ? "Done"
+                      : "Closed",
       files: uploadedFiles.map((file) => ({
         name: file.name,
         size: file.size,
@@ -106,6 +113,16 @@ export default function AddCapaModal({ isOpen, onClose, onAddCapa, mode }: AddCa
       })),
       createdDate: new Date().toISOString().split("T")[0],
       createdBy: "Current User",
+    }
+
+    try {
+      await fetch('/api/capa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newCapa),
+      })
+    } catch (err) {
+      console.error('Failed to save CAPA', err)
     }
 
     onAddCapa(newCapa)
@@ -142,6 +159,8 @@ export default function AddCapaModal({ isOpen, onClose, onAddCapa, mode }: AddCa
         return "Tambah CAPA Baru"
       case "in-progress":
         return "Update Progress CAPA"
+      case "done":
+        return "CAPA Selesai"
       case "closed":
         return "Tambah CAPA Selesai"
       default:

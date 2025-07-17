@@ -11,10 +11,26 @@ import { ArrowLeft, Edit, Calendar, User, Building, Shield, Target, CheckCircle2
 import Link from "next/link";
 import { useToast } from "@/components/ui/use-toast";
 import { AddFindingModal } from "@/components/audit/add-finding-modal";
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+
 
 // Definisikan tipe data
 interface Finding { _id: string; findingType: string; severity: string; description: string; clause: string; status: string; }
-interface Audit { _id: string; name: string; standard: string; department: string; date: string; status: string; auditor: string; auditType: string; tujuan?: string; scope?: string; objectives?: string; criteria?: string; scheduledTime?: string; }
+interface Audit {
+    _id: string
+    name: string
+    standard: string | string[]
+    department: string
+    date: string
+    status: string
+    auditor: string
+    auditType: string
+    tujuan?: string
+    scope?: string
+    objectives?: string
+    criteria?: string
+    scheduledTime?: string
+}
 
 export default function AuditDetailPage() {
     const params = useParams();
@@ -70,6 +86,7 @@ export default function AuditDetailPage() {
                 </div>
             </div>
 
+            <TooltipProvider>
             <Tabs defaultValue="detail" className="w-full">
                 <TabsList className="mb-4">
                     <TabsTrigger value="detail">Detail Audit</TabsTrigger>
@@ -80,10 +97,45 @@ export default function AuditDetailPage() {
                     <Card>
                         <CardHeader><CardTitle>Informasi Detail</CardTitle></CardHeader>
                         <CardContent className="space-y-4 pt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground">Standar</p><p>{audit.standard}</p></div>
+                            <div className="space-y-1">
+                                <p className="text-sm font-medium text-muted-foreground">Standar</p>
+                                <div className="flex flex-wrap items-center gap-1">
+                                    {Array.isArray(audit.standard) && audit.standard.length > 0 ? (
+                                        <>
+                                            {audit.standard.slice(0, 2).map((std) => (
+                                                <Badge key={std} variant="secondary">{std}</Badge>
+                                            ))}
+                                            {audit.standard.length > 2 && (
+                                                <Tooltip>
+                                                    <TooltipTrigger>
+                                                        <Badge variant="outline">+{audit.standard.length - 2} lagi...</Badge>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <div className="flex flex-col gap-1 p-1">
+                                                            {audit.standard.slice(2).map((std) => (
+                                                                <span key={std} className="text-xs">{std}</span>
+                                                            ))}
+                                                        </div>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <span className="text-xs text-muted-foreground">-</span>
+                                    )}
+                                </div>
+                            </div>
                             <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground">Jenis</p><p><Badge variant={audit.auditType === 'Internal' ? 'default' : 'secondary'}>{audit.auditType}</Badge></p></div>
                             <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground">Status</p><p>{audit.status}</p></div>
-                            <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground">Departemen</p><p className="flex items-center"><Building className="mr-2 h-4 w-4" />{audit.department}</p></div>
+                            <div className="space-y-1">
+                                <p className="text-sm font-medium text-muted-foreground">
+                                    {audit.auditType === "External" ? "Lembaga Sertifikasi" : "Departemen"}
+                                </p>
+                                <p className="flex items-center">
+                                    <Building className="mr-2 h-4 w-4" />
+                                    {audit.department}
+                                </p>
+                            </div>
                             <div className="space-y-1"><p className="text-sm font-medium text-muted-foreground">Auditor</p><p className="flex items-center"><User className="mr-2 h-4 w-4" />{audit.auditor}</p></div>
                         </CardContent>
                     </Card>
@@ -130,6 +182,7 @@ export default function AuditDetailPage() {
                     </Card>
                 </TabsContent>
             </Tabs>
+            </TooltipProvider>
         </div>
     );
 }

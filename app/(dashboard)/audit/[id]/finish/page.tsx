@@ -1,4 +1,5 @@
-"use client"
+"use client";
+
 
 import { useState, useEffect, FormEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -14,8 +15,9 @@ import { ArrowLeft, Save, Upload, X } from "lucide-react";
 interface Audit {
     _id: string;
     name: string;
-    standard: string;
+    standard: string | string[];
     department: string;
+    auditType?: string;
     auditor: string;
     date: string;
     scope?: string;
@@ -27,6 +29,9 @@ interface Audit {
     conclusion?: string;
     reportFile?: string;
     evidenceFiles?: string[];
+    positiveFindings?: string[];
+    recommendations?: string[];
+    nextAuditDate?: string;
 }
 
 export default function FinishAuditPage() {
@@ -37,12 +42,13 @@ export default function FinishAuditPage() {
 
     const [audit, setAudit] = useState<Audit | null>(null);
     const [formData, setFormData] = useState<Partial<Audit>>({});
+    const [positiveFindingsText, setPositiveFindingsText] = useState("");
+    const [recommendationsText, setRecommendationsText] = useState("");
+    const [nextAuditDate, setNextAuditDate] = useState("");
     const [reportFile, setReportFile] = useState<File | null>(null);
     const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
     const [isSaving, setIsSaving] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
+    const [isLoading, setIsLoading] = useState(true); useEffect(() => {
         if (!auditId) return;
         const fetchAudit = async () => {
             setIsLoading(true);
@@ -55,6 +61,7 @@ export default function FinishAuditPage() {
                     name: data.name,
                     standard: data.standard,
                     department: data.department,
+                    auditType: data.auditType,
                     auditor: data.auditor,
                     date: data.date,
                     scope: data.scope || "",
@@ -65,12 +72,20 @@ export default function FinishAuditPage() {
                     findings: data.findings || 0,
                     conclusion: data.conclusion || "",
                 });
+                setPositiveFindingsText((data.positiveFindings || []).join("\n"));
+                setRecommendationsText((data.recommendations || []).join("\n"));
+                setNextAuditDate(data.nextAuditDate || "");
             } catch (error) {
-                toast({ variant: "destructive", title: "Error", description: (error as Error).message });
+                toast({
+                    variant: "destructive",
+                    title: "Error",
+                    description: (error as Error).message,
+                });
             } finally {
                 setIsLoading(false);
             }
-        };
+    };
+
         fetchAudit();
     }, [auditId, toast]);
 
@@ -85,11 +100,12 @@ export default function FinishAuditPage() {
     };
 
     const removeEvidenceFile = (index: number) => {
-        setEvidenceFiles(prev => prev.filter((_, i) => i !== index));
+        setEvidenceFiles((prev) => prev.filter((_, i) => i !== index));
     };
 
+
     const handleInputChange = (field: keyof Audit, value: string | number) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
+        setFormData((prev) => ({ ...prev, [field]: value }));
     };
 
     const handleSubmit = async (e: FormEvent) => {
@@ -97,11 +113,28 @@ export default function FinishAuditPage() {
         if (!audit) return;
         setIsSaving(true);
         try {
+            const findingsRes = await fetch(`/api/findings?auditId=${audit._id}`);
+            if (!findingsRes.ok) throw new Error("Gagal memeriksa status temuan.");
+            const findingsData = await findingsRes.json();
+            const openFindings = findingsData.filter(
+                (f: any) => f.status && f.status.toLowerCase() !== "closed",
+            );
+            if (openFindings.length > 0) {
+                window.alert(
+                    "Masih terdapat temuan dengan status Open atau In Progress.\n" +
+                    "Semua temuan harus di-close sebelum audit dapat diselesaikan.",
+                );
+                setIsSaving(false);
+                return;
+            }
             let reportFileId = audit.reportFile || null;
             if (reportFile) {
                 const data = new FormData();
                 data.append("file", reportFile);
-                const uploadRes = await fetch("/api/upload", { method: "POST", body: data });
+                const uploadRes = await fetch("/api/upload", {
+                    method: "POST",
+                    body: data,
+                });
                 if (!uploadRes.ok) throw new Error("Gagal mengupload laporan.");
                 const uploadResult = await uploadRes.json();
                 reportFileId = uploadResult.fileId;
@@ -120,6 +153,15 @@ export default function FinishAuditPage() {
             const payload = {
                 ...audit,
                 ...formData,
+                positiveFindings: positiveFindingsText
+                    .split("\n")
+                    .map((f) => f.trim())
+                    .filter((f) => f),
+                recommendations: recommendationsText
+                    .split("\n")
+                    .map((r) => r.trim())
+                    .filter((r) => r),
+                nextAuditDate,
                 status: "Completed",
                 reportFile: reportFileId,
                 evidenceFiles: evidenceFileIds,
@@ -134,15 +176,24 @@ export default function FinishAuditPage() {
             toast({ title: "Sukses", description: "Audit telah diselesaikan." });
             router.push(`/audit/${audit._id}`);
         } catch (error) {
-            toast({ variant: "destructive", title: "Error", description: (error as Error).message });
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: (error as Error).message,
+            });
         } finally {
             setIsSaving(false);
         }
     };
+    if (isLoading)
+        return <div className="container p-6 text-center">Memuat form...</div>;
+    if (!audit)
 
-    if (isLoading) return <div className="container p-6 text-center">Memuat form...</div>;
-    if (!audit) return <div className="container p-6 text-center text-red-500">Audit tidak ditemukan.</div>;
-
+    return (
+        <div className="container p-6 text-center text-red-500">
+            Audit tidak ditemukan.
+        </div>
+    );
     return (
         <div className="container mx-auto px-4 py-6">
             <div className="flex items-center space-x-4 mb-6">
@@ -156,41 +207,97 @@ export default function FinishAuditPage() {
             <form onSubmit={handleSubmit} className="space-y-6">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Informasi Dasar</CardTitle>
+                        <CardTitle className="font-bold">Informasi Dasar</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="name">Nama Audit *</Label>
-                                <Input id="name" value={formData.name || ""} onChange={e => handleInputChange("name", e.target.value)} required />
+                                <Input
+                                    id="name"
+                                    value={formData.name || ""}
+                                    onChange={(e) => handleInputChange("name", e.target.value)}
+                                    required
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="standard">Standar *</Label>
-                                <Input id="standard" value={formData.standard || ""} onChange={e => handleInputChange("standard", e.target.value)} required />
+                                <Input
+                                    id="standard"
+                                    value={Array.isArray(formData.standard) ? formData.standard.join(", ") : formData.standard || ""}
+                                    onChange={(e) =>
+                                        handleInputChange("standard", e.target.value)
+                                    }
+                                    required
+                                />
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="department">Departemen *</Label>
-                                <Input id="department" value={formData.department || ""} onChange={e => handleInputChange("department", e.target.value)} required />
+                                <Label htmlFor="department">
+                                    {formData.auditType === 'External' ? 'Lembaga Sertifikasi *' : 'Departemen *'}
+                                </Label>
+                                <Input
+                                    id="department"
+                                    value={formData.department || ""}
+                                    onChange={(e) =>
+                                        handleInputChange("department", e.target.value)
+                                    }
+                                    required
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="auditor">Auditor *</Label>
-                                <Input id="auditor" value={formData.auditor || ""} onChange={e => handleInputChange("auditor", e.target.value)} required />
+                                <Input
+                                    id="auditor"
+                                    value={formData.auditor || ""}
+                                    onChange={(e) => handleInputChange("auditor", e.target.value)}
+                                    required
+                                />
                             </div>
                         </div>
                         <div className="grid grid-cols-3 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="date">Tanggal Mulai *</Label>
-                                <Input id="date" type="date" value={formData.date || ""} onChange={e => handleInputChange("date", e.target.value)} required />
+                                <Input
+                                    id="date"
+                                    type="date"
+                                    value={formData.date || ""}
+                                    onChange={(e) => handleInputChange("date", e.target.value)}
+                                    required
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="completedDate">Tanggal Selesai *</Label>
-                                <Input id="completedDate" type="date" value={formData.completedDate || ""} onChange={e => handleInputChange("completedDate", e.target.value)} required />
+                                <Input
+                                    id="completedDate"
+                                    type="date"
+                                    value={formData.completedDate || ""}
+                                    onChange={(e) =>
+                                        handleInputChange("completedDate", e.target.value)
+                                    }
+                                    required
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="duration">Durasi</Label>
-                                <Input id="duration" value={formData.duration || ""} onChange={e => handleInputChange("duration", e.target.value)} placeholder="Contoh: 2 hari" />
+                                <Input
+                                    id="duration"
+                                    value={formData.duration || ""}
+                                    onChange={(e) =>
+                                        handleInputChange("duration", e.target.value)
+                                    }
+                                    placeholder="Contoh: 2 hari"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="nextAuditDate">Jadwal Audit Berikutnya</Label>
+                                <Input
+                                    id="nextAuditDate"
+                                    type="date"
+                                    value={nextAuditDate}
+                                    onChange={(e) => setNextAuditDate(e.target.value)}
+                                />
                             </div>
                         </div>
                     </CardContent>
@@ -198,73 +305,166 @@ export default function FinishAuditPage() {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Detail Audit</CardTitle>
+                        <CardTitle className="font-bold">Detail Audit</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="scope">Ruang Lingkup Audit</Label>
-                            <Textarea id="scope" value={formData.scope || ""} onChange={e => handleInputChange("scope", e.target.value)} rows={2} />
+                            <Textarea
+                                id="scope"
+                                value={formData.scope || ""}
+                                onChange={(e) => handleInputChange("scope", e.target.value)}
+                                rows={2}
+                            />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="objectives">Tujuan Audit</Label>
-                            <Textarea id="objectives" value={formData.objectives || ""} onChange={e => handleInputChange("objectives", e.target.value)} rows={2} />
+                            <Textarea
+                                id="objectives"
+                                value={formData.objectives || ""}
+                                onChange={(e) =>
+                                    handleInputChange("objectives", e.target.value)
+                                }
+                                rows={2}
+                            />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="criteria">Kriteria Audit</Label>
-                            <Textarea id="criteria" value={formData.criteria || ""} onChange={e => handleInputChange("criteria", e.target.value)} rows={2} />
+                            <Textarea
+                                id="criteria"
+                                value={formData.criteria || ""}
+                                onChange={(e) => handleInputChange("criteria", e.target.value)}
+                                rows={2}
+                            />
                         </div>
                     </CardContent>
                 </Card>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Hasil Audit</CardTitle>
+                        <CardTitle className="font-bold">Hasil Audit</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="findings">Jumlah Temuan</Label>
-                                <Input id="findings" type="number" value={formData.findings ?? ""} onChange={e => handleInputChange("findings", parseInt(e.target.value || "0"))} min="0" />
+                                <Input
+                                    id="findings"
+                                    type="number"
+                                    value={formData.findings ?? ""}
+                                    onChange={(e) =>
+                                        handleInputChange(
+                                            "findings",
+                                            parseInt(e.target.value || "0"),
+                                        )
+                                    }
+                                    min="0"
+                                />
                             </div>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="conclusion">Kesimpulan Audit</Label>
-                            <Textarea id="conclusion" value={formData.conclusion || ""} onChange={e => handleInputChange("conclusion", e.target.value)} rows={3} />
+                            <Textarea
+                                id="conclusion"
+                                value={formData.conclusion || ""}
+                                onChange={(e) =>
+                                    handleInputChange("conclusion", e.target.value)
+                                }
+                                rows={3}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="positiveFindings">
+                                Temuan Positif (pisahkan per baris)
+                            </Label>
+                            <Textarea
+                                id="positiveFindings"
+                                value={positiveFindingsText}
+                                onChange={(e) => setPositiveFindingsText(e.target.value)}
+                                rows={3}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="recommendations">
+                                Rekomendasi Umum (pisahkan per baris)
+                            </Label>
+                            <Textarea
+                                id="recommendations"
+                                value={recommendationsText}
+                                onChange={(e) => setRecommendationsText(e.target.value)}
+                                rows={3}
+                            />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="reportFile">Upload Laporan Audit</Label>
                             <div className="flex items-center space-x-2">
-                                <Input id="reportFile" type="file" accept=".pdf,.doc,.docx" onChange={handleReportChange} className="flex-1" />
+                                <Input
+                                    id="reportFile"
+                                    type="file"
+                                    accept=".pdf,.doc,.docx"
+                                    onChange={handleReportChange}
+                                    className="flex-1"
+                                />
                                 <Upload className="h-4 w-4 text-muted-foreground" />
                             </div>
-                            {reportFile && <p className="text-sm text-muted-foreground">{reportFile.name}</p>}
+                            {reportFile && (
+                                <p className="text-sm text-muted-foreground">
+                                    {reportFile.name}
+                                </p>
+                            )}
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="evidenceFiles">Upload Bukti/Evidence (Multiple Files)</Label>
+                            <Label htmlFor="evidenceFiles">
+                                Upload Bukti/Evidence (Multiple Files)
+                            </Label>
                             <div className="flex items-center space-x-2">
-                                <Input id="evidenceFiles" type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx" onChange={e => handleEvidenceChange(e.target.files)} className="flex-1" />
+                                <Input
+                                    id="evidenceFiles"
+                                    type="file"
+                                    multiple
+                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx"
+                                    onChange={(e) => handleEvidenceChange(e.target.files)}
+                                    className="flex-1"
+                                />
                                 <Upload className="h-4 w-4 text-muted-foreground" />
                             </div>
                             {evidenceFiles.length > 0 && (
                                 <div className="space-y-1">
                                     <p className="text-sm font-medium">Files uploaded:</p>
                                     {evidenceFiles.map((file, index) => (
-                                        <div key={index} className="flex items-center justify-between text-sm text-muted-foreground">
+                                        <div
+                                            key={index}
+                                            className="flex items-center justify-between text-sm text-muted-foreground"
+                                        >
                                             <span>{file.name}</span>
-                                            <Button type="button" variant="ghost" size="sm" onClick={() => removeEvidenceFile(index)}>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => removeEvidenceFile(index)}
+                                            >
                                                 <X className="h-3 w-3" />
                                             </Button>
                                         </div>
                                     ))}
-                                </div>
+                </div>
+
                             )}
                         </div>
                     </CardContent>
                 </Card>
 
                 <div className="flex justify-end">
-                    <Button type="submit" disabled={isSaving}>{isSaving ? "Menyimpan..." : <><Save className="mr-2 h-4 w-4" /> Simpan Audit</>}</Button>
-                </div>
+                    <Button type="submit" disabled={isSaving}>
+                        {isSaving ? (
+                            "Menyimpan..."
+                        ) : (
+                            <>
+                                <Save className="mr-2 h-4 w-4" /> Simpan Audit
+                            </>
+                        )}
+                    </Button>
+        </div>
             </form>
         </div>
     );

@@ -50,12 +50,6 @@ export function MainNav() {
       active: pathname.startsWith("/audit"),
     },
     {
-      href: "/capa",
-      label: "CAPA",
-      icon: <Shield className="h-5 w-5 mr-2" />,
-      active: pathname.startsWith("/capa"),
-    },
-    {
       href: "/reports",
       label: "Laporan",
       icon: <BarChart className="h-5 w-5 mr-2" />,

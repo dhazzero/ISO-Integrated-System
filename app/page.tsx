@@ -38,12 +38,6 @@ export default function Home() {
       href: "/audit",
     },
     {
-      title: "Manajemen CAPA",
-      description: "Siklus CAPA terpadu dan analisis akar masalah",
-      icon: <Shield className="h-8 w-8 text-red-500" />,
-      href: "/capa",
-    },
-    {
       title: "Pelaporan & Dasbor",
       description: "Visibilitas menyeluruh dan pelaporan yang disederhanakan",
       icon: <BarChart className="h-8 w-8 text-indigo-500" />,

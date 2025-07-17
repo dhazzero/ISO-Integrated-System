@@ -1,16 +1,16 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react"
-import Link from "next/link"
-import { useParams, useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 
 export default function EditControlPage() {
   const params = useParams()
@@ -18,33 +18,39 @@ export default function EditControlPage() {
   const controlId = params.id
 
   const [formData, setFormData] = useState({
-    name: "Kontrol Dokumen",
-    description:
-      "Sistem kontrol dokumen untuk memastikan dokumen yang digunakan adalah versi terkini dan telah disetujui",
-    category: "Dokumentasi",
-    owner: "Document Controller",
-    status: "Implemented",
-    effectiveness: "High",
-    nextReview: "2023-12-15",
-    standards: [
-      { id: 1, name: "ISO 9001:2015", clause: "7.5.3", selected: true },
-      { id: 2, name: "ISO 27001:2022", clause: "7.5.3", selected: true },
-      { id: 3, name: "ISO 37001:2016", clause: "7.5.3", selected: true },
-    ],
-    gaps: [
-      {
-        id: 1,
-        standard: "ISO 27001:2022",
-        clause: "7.5.3.2",
-        description: "Kontrol akses digital untuk dokumen elektronik belum sepenuhnya diterapkan",
-        severity: "Medium",
-        dueDate: "2023-09-30",
-        responsible: "IT Manager",
-      },
-    ],
+    name: "",
+    description: "",
+    category: "",
+    owner: "",
+    status: "",
+    effectiveness: "",
+    nextReview: "",
+    standards: [] as any[],
+    gaps: [] as any[],
   })
 
   const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    const load = async () => {
+      const res = await fetch(`/api/compliance/controls/${controlId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setFormData({
+          name: data.name || "",
+          description: data.description || "",
+          category: data.category || "",
+          owner: data.owner || "",
+          status: data.status || "",
+          effectiveness: data.effectiveness || "",
+          nextReview: data.nextReview || "",
+          standards: data.standards || [],
+          gaps: data.gaps || [],
+        })
+      }
+    }
+    load()
+  }, [controlId])
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({
@@ -90,15 +96,19 @@ export default function EditControlPage() {
     }))
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-
-    // Simulasi API call
-    setTimeout(() => {
-      setIsLoading(false)
+    try {
+      await fetch(`/api/compliance/controls/${controlId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      })
       router.push(`/compliance/controls/${controlId}`)
-    }, 1500)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const categories = ["Dokumentasi", "Keamanan", "Operasional", "Manajemen", "Teknis"]
