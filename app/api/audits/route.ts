@@ -27,7 +27,10 @@ export async function POST(request: NextRequest) {
         const data = await request.json()
         const { db } = await connectToDatabase()
 
-        if (!data.name || !data.standard || !data.department || !data.date || !data.auditor) {
+        const hasStandard = Array.isArray(data.standard)
+            ? data.standard.length > 0
+            : !!data.standard
+        if (!data.name || !hasStandard || !data.department || !data.date || !data.auditor) {
             return NextResponse.json({ message: 'Data audit tidak lengkap' }, { status: 400 })
         }
 

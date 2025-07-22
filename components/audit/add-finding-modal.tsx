@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
+import { useAuditTrail } from "@/hooks/use-audit-trail"
 
 // Definisikan tipe data untuk props
 interface AuditOption {
@@ -33,12 +34,14 @@ interface DepartmentOption {
 
 interface AddFindingModalProps {
   audits: AuditOption[];
+  onAddFinding: () => void;
 }
 
 export function AddFindingModal({ onAddFinding, audits }: AddFindingModalProps) {
   const [open, setOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast();
+  const { logCreate } = useAuditTrail();
 
   const [departments, setDepartments] = useState<DepartmentOption[]>([]);
   const [isLoadingDepartments, setIsLoadingDepartments] = useState(false);
@@ -58,6 +61,8 @@ export function AddFindingModal({ onAddFinding, audits }: AddFindingModalProps) 
   };
 
   const [formData, setFormData] = useState(initialFormState);
+
+  const isOFI = formData.findingType === "Opportunity for Improvement";
 
   // Fetch data departemen saat modal dibuka
   useEffect(() => {
@@ -97,8 +102,17 @@ export function AddFindingModal({ onAddFinding, audits }: AddFindingModalProps) 
       });
       if (!response.ok) throw new Error((await response.json()).message || 'Gagal menyimpan temuan.');
 
+      const newFinding = await response.json();
+      logCreate(
+        'Audit',
+        'Finding',
+        newFinding._id || `F-${Date.now()}`,
+        newFinding.auditName,
+        newFinding,
+      );
+
       toast({ title: "Sukses", description: "Temuan baru berhasil ditambahkan." });
-        onAddFinding(); // Panggil callback untuk memperbarui daftar temuan
+      onAddFinding(); // Panggil callback untuk memperbarui daftar temuan
       setFormData(initialFormState);
       setOpen(false);
     } catch (error) {
@@ -128,38 +142,137 @@ export function AddFindingModal({ onAddFinding, audits }: AddFindingModalProps) 
               <div className="space-y-2"><Label htmlFor="findingType">Jenis Temuan *</Label><Select required value={formData.findingType} onValueChange={v => handleInputChange("findingType", v)}><SelectTrigger id="findingType"><SelectValue placeholder="Pilih jenis" /></SelectTrigger><SelectContent><SelectItem value="Non-Conformity">Non-Conformity</SelectItem><SelectItem value="Observation">Observation</SelectItem><SelectItem value="Opportunity for Improvement">Opportunity for Improvement</SelectItem></SelectContent></Select></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label htmlFor="severity">Tingkat Severity *</Label><Select required value={formData.severity} onValueChange={v => handleInputChange("severity", v)}><SelectTrigger id="severity"><SelectValue placeholder="Pilih tingkat" /></SelectTrigger><SelectContent><SelectItem value="Critical">Critical</SelectItem><SelectItem value="Major">Major</SelectItem><SelectItem value="Minor">Minor</SelectItem></SelectContent></Select></div>
-              <div className="space-y-2"><Label htmlFor="clause">Klausul Standar *</Label><Input id="clause" value={formData.clause} onChange={e => handleInputChange("clause", e.target.value)} required placeholder="Contoh: 7.1.5"/></div>
+              {!isOFI && (
+                <div className="space-y-2">
+                  <Label htmlFor="severity">Tingkat Severity *</Label>
+                  <Select
+                    required
+                    value={formData.severity}
+                    onValueChange={(v) => handleInputChange("severity", v)}
+                  >
+                    <SelectTrigger id="severity">
+                      <SelectValue placeholder="Pilih tingkat" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Critical">Critical</SelectItem>
+                      <SelectItem value="Major">Major</SelectItem>
+                      <SelectItem value="Minor">Minor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="clause">Klausul Standar *</Label>
+                <Input
+                  id="clause"
+                  value={formData.clause}
+                  onChange={(e) => handleInputChange("clause", e.target.value)}
+                  required
+                  placeholder="Contoh: 7.1.5"
+                />
+              </div>
             </div>
 
             <div className="space-y-2"><Label htmlFor="description">Deskripsi Temuan *</Label><Textarea id="description" value={formData.description} onChange={e => handleInputChange("description", e.target.value)} required rows={3} placeholder="Jelaskan temuan secara detail..."/></div>
 
-            {/* --- FIELD YANG DIKEMBALIKAN --- */}
-            <div className="space-y-2"><Label htmlFor="evidence">Bukti/Evidence</Label><Textarea id="evidence" value={formData.evidence} onChange={e => handleInputChange("evidence", e.target.value)} rows={3} placeholder="Jelaskan bukti yang mendukung temuan..."/></div>
-            <div className="space-y-2"><Label htmlFor="recommendation">Rekomendasi</Label><Textarea id="recommendation" value={formData.recommendation} onChange={e => handleInputChange("recommendation", e.target.value)} rows={3} placeholder="Berikan rekomendasi perbaikan..."/></div>
+            {!isOFI && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="evidence">Bukti/Evidence</Label>
+                  <Textarea
+                    id="evidence"
+                    value={formData.evidence}
+                    onChange={(e) => handleInputChange("evidence", e.target.value)}
+                    rows={3}
+                    placeholder="Jelaskan bukti yang mendukung temuan..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="recommendation">Rekomendasi</Label>
+                  <Textarea
+                    id="recommendation"
+                    value={formData.recommendation}
+                    onChange={(e) =>
+                      handleInputChange("recommendation", e.target.value)
+                    }
+                    rows={3}
+                    placeholder="Berikan rekomendasi perbaikan..."
+                  />
+                </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="department">Departemen</Label>
-                <Select value={formData.department} onValueChange={(v) => handleInputChange("department", v)}>
-                  <SelectTrigger id="department">
-                    <SelectValue placeholder={isLoadingDepartments ? "Memuat..." : "Pilih departemen"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {isLoadingDepartments ? (
-                        <SelectItem value="loading" disabled>Memuat...</SelectItem>
-                    ) : (
-                        departments.map((d) => <SelectItem key={d._id} value={d.name}>{d.name}</SelectItem>)
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2"><Label htmlFor="responsiblePerson">Penanggung Jawab</Label><Input id="responsiblePerson" value={formData.responsiblePerson} onChange={e => handleInputChange("responsiblePerson", e.target.value)} placeholder="Nama penanggung jawab"/></div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label htmlFor="status">Status</Label><Select value={formData.status} onValueChange={(v) => handleInputChange("status", v)}><SelectTrigger id="status"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Open">Open</SelectItem><SelectItem value="In Progress">In Progress</SelectItem><SelectItem value="Closed">Closed</SelectItem></SelectContent></Select></div>
-              <div className="space-y-2"><Label htmlFor="dueDate">Target Penyelesaian</Label><Input id="dueDate" type="date" value={formData.dueDate} onChange={e => handleInputChange("dueDate", e.target.value)} /></div>
-            </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="department">Departemen</Label>
+                    <Select
+                      value={formData.department}
+                      onValueChange={(v) => handleInputChange("department", v)}
+                    >
+                      <SelectTrigger id="department">
+                        <SelectValue
+                          placeholder={
+                            isLoadingDepartments ? "Memuat..." : "Pilih departemen"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {isLoadingDepartments ? (
+                          <SelectItem value="loading" disabled>
+                            Memuat...
+                          </SelectItem>
+                        ) : (
+                          departments.map((d) => (
+                            <SelectItem key={d._id} value={d.name}>
+                              {d.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="responsiblePerson">Penanggung Jawab</Label>
+                    <Input
+                      id="responsiblePerson"
+                      value={formData.responsiblePerson}
+                      onChange={(e) =>
+                        handleInputChange("responsiblePerson", e.target.value)
+                      }
+                      placeholder="Nama penanggung jawab"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Status</Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(v) => handleInputChange("status", v)}
+                    >
+                      <SelectTrigger id="status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Open">Open</SelectItem>
+                        <SelectItem value="In Progress">In Progress</SelectItem>
+                        <SelectItem value="Closed">Closed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="dueDate">Target Penyelesaian</Label>
+                    <Input
+                      id="dueDate"
+                      type="date"
+                      value={formData.dueDate}
+                      onChange={(e) =>
+                        handleInputChange("dueDate", e.target.value)
+                      }
+                    />
+                  </div>
+                </div>
+              </>
+            )}
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>Batal</Button>

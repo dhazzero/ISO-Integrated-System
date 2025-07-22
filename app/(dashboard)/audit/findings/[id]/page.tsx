@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Edit } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/components/ui/use-toast";
+import { formatDate } from "@/lib/utils";
 
 interface Finding {
     _id: string;  auditId: string; auditName: string; findingType: string; severity: string;
@@ -80,7 +81,7 @@ export default function FindingDetailPage() {
                         <p><strong>Departemen:</strong> {finding.department}</p>
                         <p><strong>Penanggung Jawab:</strong> {finding.responsiblePerson}</p>
                         <p><strong>Status:</strong> {finding.status}</p>
-                        <p><strong>Target Selesai:</strong> {finding.dueDate ? new Date(finding.dueDate).toLocaleDateString() : '-'}</p>
+                        <p><strong>Target Selesai:</strong> {finding.dueDate ? formatDate(finding.dueDate) : '-'}</p>
                     </div>
                 </CardContent>
             </Card>
