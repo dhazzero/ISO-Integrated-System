@@ -204,7 +204,6 @@ export default function AddOjkReportModal({ onSaved }: AddOjkReportModalProps) {
                         {preview && (
                             <iframe src={preview} className="w-full h-48 border rounded" />
                         )}
-                        />
                     </div>
                     <DialogFooter>
                         <Button type="submit" disabled={isLoading}>
