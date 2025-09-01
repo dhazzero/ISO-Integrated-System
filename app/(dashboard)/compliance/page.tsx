@@ -35,21 +35,23 @@ export default function CompliancePage() {
 
     const fetchStandards = async () => {
         try {
-            const [stdRes, ctrlRes, annexRes] = await Promise.all([
+            const [stdRes, ctrlRes, annexRes, ojkRes] = await Promise.all([
                 fetch('/api/settings/standards'),
                 fetch('/api/compliance/controls'),
                 fetch('/api/compliance/annex-a'),
+                fetch('/api/compliance/ojk-reports'),
             ])
-            if (!stdRes.ok || !ctrlRes.ok || !annexRes.ok) {
+            if (!stdRes.ok || !ctrlRes.ok || !annexRes.ok || !ojkRes.ok) {
                 throw new Error('Gagal mengambil data kepatuhan')
             }
-            const [stdData, ctrlData, annexData] = await Promise.all([
+            const [stdData, ctrlData, annexData, ojkData] = await Promise.all([
                 stdRes.json(),
                 ctrlRes.json(),
                 annexRes.json(),
+                ojkRes.json(),
             ])
 
-            const implementedStatuses = ['Diterapkan', 'Diterapkan / Implemented', 'Implemented']
+            const implementedStatuses = ['Diterapkan', 'Diterapkan / Implemented', 'Implemented', 'Dilaporkan', 'Sudah Dilaporkan']
             const partialStatuses = ['Partial', 'Sebagian', 'Partially Implemented', 'Under Review']
 
             const summaries = stdData.map((std: { _id: string; name?: string; title?: string }) => {
@@ -75,7 +77,8 @@ export default function CompliancePage() {
             })
 
             // Aggregate metrics for the top header
-            const allItems = [...ctrlData, ...annexData]
+            const normalizedOjk = ojkData.map((o: any) => ({ ...o, status: o.Status }));
+            const allItems = [...ctrlData, ...annexData, ...normalizedOjk]
             const totalClausesAgg = allItems.length
             const totalStandardsAgg = Array.isArray(stdData) ? stdData.length : 0
             const totalCompliantAgg = allItems.filter((x: any) => implementedStatuses.includes(x.status || '')).length

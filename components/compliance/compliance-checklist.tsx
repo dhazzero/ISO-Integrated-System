@@ -92,7 +92,15 @@ export default function ComplianceChecklist() {
                                     <td className="py-2 px-3 font-medium">{clause.name}</td>
                                     <td className="py-2 px-3">{clause.relatedStandards?.join(", ") || "-"}</td>
                                     <td className="py-2 px-3">
-                                        {clause.status && <Badge variant="outline">{clause.status}</Badge>}
+                                        {clause.status && <Badge variant={
+                                            (() => {
+                                                const s = clause.status.toLowerCase();
+                                                if (s.includes("implemented") || s.includes("diterapkan")) return "default";
+                                                if (s.includes("not implemented") || s.includes("belum")) return "destructive";
+                                                if (s.includes("partial") || s.includes("sebagian")) return "secondary";
+                                                return "outline";
+                                            })()
+                                        }>{clause.status}</Badge>}
                                     </td>
                                     <td className="py-2 px-3">{clause.effectiveness || "-"}</td>
                                     <td className="py-2 px-3">

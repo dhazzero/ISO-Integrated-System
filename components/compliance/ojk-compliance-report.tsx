@@ -20,7 +20,7 @@ interface OjkReport {
     Status?: string;
     Kepatuhan?: string;
     fileUrl?: string;
-    }
+}
 
 export default function OjkComplianceReport() {
     const [reports, setReports] = useState<OjkReport[]>([]);
@@ -86,7 +86,15 @@ export default function OjkComplianceReport() {
                                     <td className="py-2 px-3">{r.DueDate}</td>
                                     <td className="py-2 px-3">{r.Pengiriman}</td>
                                     <td className="py-2 px-3">{r.Regulasi_acuan}</td>
-                                    <td className="py-2 px-3">{r.Status ? <Badge variant="outline">{r.Status}</Badge> : "-"}</td>
+                                    <td className="py-2 px-3">{r.Status ? <Badge variant={
+                                        (() => {
+                                            const s = r.Status.toLowerCase();
+                                            if (s.includes("implemented") || s.includes("diterapkan") || s.includes("dilaporkan")) return "default";
+                                            if (s.includes("not implemented") || s.includes("belum")) return "destructive";
+                                            if (s.includes("partial") || s.includes("sebagian") || s.includes("proses")) return "secondary";
+                                            return "outline";
+                                        })()
+                                    }>{r.Status}</Badge> : "-"}</td>
                                     <td className="py-2 px-3">
                                         {r.Kepatuhan ? <Badge variant="outline">{`${r.Kepatuhan}%`}</Badge> : "-"}
                                     </td>
