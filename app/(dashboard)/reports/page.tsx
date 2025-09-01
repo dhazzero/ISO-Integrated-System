@@ -80,7 +80,7 @@ interface FindingItem {
 }
 
 
-const implementedStatuses = ["Diterapkan", "Diterapkan / Implemented", "Implemented"];
+const implementedStatuses = ["Diterapkan", "Diterapkan / Implemented", "Implemented", "Dilaporkan", "Sudah Dilaporkan"];
 const partialStatuses = ["Partial", "Sebagian", "Partially Implemented", "Under Review"];
 
 const isCompletedStatus = (s?: string) => {
@@ -98,8 +98,8 @@ const chartConfig = {
     standards: { label: "Integrated Standards", color: "hsl(var(--chart-2))" },
     annex: { label: "ISO 27001 Annex A", color: "hsl(var(--chart-3))" },
     ojk: { label: "OJK Information", color: "hsl(var(--chart-4))" },
-    minor: { label: "Minor", color: "hsl(var(--chart-4))" },
     major: { label: "Major", color: "hsl(var(--destructive))" },
+    minor: { label: "Minor", color: "hsl(var(--chart-4))" },
     opportunity: { label: "Opportunity", color: "hsl(var(--chart-2))" },
 } satisfies ChartConfig;
 
@@ -157,7 +157,8 @@ export default function ReportsPage() {
 
     const metrics = useMemo(() => {
         // Kepatuhan
-        const combined: Array<ControlItem | AnnexItem> = [...controls, ...annex];
+        const normalizedOjk = ojkReports.map(o => ({ ...o, status: o.Status, documentIds: o.fileUrl ? [o.fileUrl] : [] }));
+        const combined: Array<ControlItem | AnnexItem | any> = [...controls, ...annex, ...normalizedOjk];
         const totalClauses = combined.length;
         const totalCompliant = combined.filter((x) => implementedStatuses.includes(x.status || "")).length;
         const totalPartial = combined.filter((x) => partialStatuses.includes(x.status || "")).length;
@@ -200,11 +201,6 @@ export default function ReportsPage() {
 
         const auditFindingSummary: Record<string, Record<string, number>> = {};
         const findingsByAuditType: Record<string, Record<string, number>> = { 'Internal': {}, 'External': {}, 'Unknown': {} };
-        const auditsByType = { 'Internal': 0, 'External': 0, 'Unknown': 0 };
-        audits.forEach(a => {
-            const type = a.auditType && ['Internal', 'External'].includes(a.auditType) ? a.auditType : 'Unknown';
-            auditsByType[type]++;
-        });
 
         findings.forEach((f: any) => {
             const severity = f.severity || "Unknown";
@@ -275,18 +271,6 @@ export default function ReportsPage() {
             ...severities
         }));
     }, [metrics.auditFindingSummary]);
-
-    const auditSummaryData = useMemo(() => {
-        const internalFindings = Object.values(metrics.findingsByAuditType.Internal || {}).reduce((a,b) => a + b, 0);
-        const externalFindings = Object.values(metrics.findingsByAuditType.External || {}).reduce((a,b) => a + b, 0);
-        const internalAudits = audits.filter(a => a.auditType === 'Internal').length;
-        const externalAudits = audits.filter(a => a.auditType === 'External').length;
-
-        return [
-            { type: 'Internal', 'Jumlah Audit': internalAudits, 'Jumlah Temuan': internalFindings },
-            { type: 'External', 'Jumlah Audit': externalAudits, 'Jumlah Temuan': externalFindings }
-        ];
-    }, [audits, metrics.findingsByAuditType]);
 
     const dashboardStatsData = useMemo(
         () => {
@@ -487,7 +471,7 @@ export default function ReportsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Overall Compliance</CardTitle>
+                                <CardTitle className="text-base font-bold">Overall Compliance</CardTitle>
                                 <Target className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
@@ -498,7 +482,7 @@ export default function ReportsPage() {
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Total Clauses</CardTitle>
+                                <CardTitle className="text-base font-bold">Total Clauses</CardTitle>
                                 <FileText className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
@@ -508,7 +492,7 @@ export default function ReportsPage() {
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Compliant</CardTitle>
+                                <CardTitle className="text-base font-bold">Compliant</CardTitle>
                                 <CheckCircle2 className="h-4 w-4 text-green-500" />
                             </CardHeader>
                             <CardContent>
@@ -518,7 +502,7 @@ export default function ReportsPage() {
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Needs Attention</CardTitle>
+                                <CardTitle className="text-base font-bold">Needs Attention</CardTitle>
                                 <AlertTriangle className="h-4 w-4 text-red-500" />
                             </CardHeader>
                             <CardContent>
@@ -558,7 +542,7 @@ export default function ReportsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Total Risks</CardTitle>
+                                <CardTitle className="text-base font-bold">Total Risks</CardTitle>
                                 <ListChecks className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
@@ -568,7 +552,7 @@ export default function ReportsPage() {
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Active Risks</CardTitle>
+                                <CardTitle className="text-base font-bold">Active Risks</CardTitle>
                                 <AlertTriangle className="h-4 w-4 text-red-500" />
                             </CardHeader>
                             <CardContent>
@@ -578,7 +562,7 @@ export default function ReportsPage() {
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Mitigated Risks</CardTitle>
+                                <CardTitle className="text-base font-bold">Mitigated Risks</CardTitle>
                                 <ShieldCheck className="h-4 w-4 text-green-500" />
                             </CardHeader>
                             <CardContent>
@@ -588,7 +572,7 @@ export default function ReportsPage() {
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Mitigation Rate</CardTitle>
+                                <CardTitle className="text-base font-bold">Mitigation Rate</CardTitle>
                                 <Gauge className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
@@ -663,7 +647,7 @@ export default function ReportsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Total Audits</CardTitle>
+                                <CardTitle className="text-base font-bold">Total Audits</CardTitle>
                                 <ListChecks className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
@@ -673,7 +657,7 @@ export default function ReportsPage() {
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Completed Audits</CardTitle>
+                                <CardTitle className="text-base font-bold">Completed Audits</CardTitle>
                                 <ShieldCheck className="h-4 w-4 text-green-500" />
                             </CardHeader>
                             <CardContent>
@@ -683,7 +667,7 @@ export default function ReportsPage() {
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Total Findings</CardTitle>
+                                <CardTitle className="text-base font-bold">Total Findings</CardTitle>
                                 <AlertTriangle className="h-4 w-4 text-amber-500" />
                             </CardHeader>
                             <CardContent>
@@ -693,7 +677,7 @@ export default function ReportsPage() {
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Audit Completion Rate</CardTitle>
+                                <CardTitle className="text-base font-bold">Audit Completion Rate</CardTitle>
                                 <Gauge className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
@@ -707,18 +691,19 @@ export default function ReportsPage() {
                         <Card>
                             <CardHeader>
                                 <CardTitle>Last Audit</CardTitle>
-                                <CardDescription>Perbandingan jumlah audit dan temuan</CardDescription>
+                                <CardDescription>Total temuan per jenis audit dan tingkat keparahan</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <ChartContainer config={chartConfig} className="h-[300px] w-full">
-                                    <BarChart data={auditSummaryData}>
+                                    <BarChart data={findingsByAuditTypeData}>
                                         <CartesianGrid vertical={false} />
                                         <XAxis dataKey="type" />
                                         <YAxis />
                                         <RechartsTooltip content={<ChartTooltipContent />} />
                                         <Legend />
-                                        <Bar dataKey="Jumlah Audit" fill="hsl(var(--chart-1))" />
-                                        <Bar dataKey="Jumlah Temuan" fill="hsl(var(--chart-2))" />
+                                        <Bar dataKey="Major" stackId="a" fill={chartConfig.major.color} name="Major" />
+                                        <Bar dataKey="Minor" stackId="a" fill={chartConfig.minor.color} name="Minor" />
+                                        <Bar dataKey="Opportunity" stackId="a" fill={chartConfig.opportunity.color} name="Opportunity" />
                                     </BarChart>
                                 </ChartContainer>
                             </CardContent>
@@ -750,7 +735,7 @@ export default function ReportsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Total Documents</CardTitle>
+                                <CardTitle className="text-base font-bold">Total Documents</CardTitle>
                                 <FileText className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
@@ -760,7 +745,7 @@ export default function ReportsPage() {
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Active Documents</CardTitle>
+                                <CardTitle className="text-base font-bold">Active Documents</CardTitle>
                                 <CheckCircle2 className="h-4 w-4 text-green-500" />
                             </CardHeader>
                             <CardContent>
@@ -770,7 +755,7 @@ export default function ReportsPage() {
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">In Review</CardTitle>
+                                <CardTitle className="text-base font-bold">In Review</CardTitle>
                                 <Clock3 className="h-4 w-4 text-yellow-500" />
                             </CardHeader>
                             <CardContent>
@@ -780,7 +765,7 @@ export default function ReportsPage() {
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Integrated Documents</CardTitle>
+                                <CardTitle className="text-base font-bold">Integrated Documents</CardTitle>
                                 <Target className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>

@@ -275,46 +275,46 @@ export default function AuditPage() {
                                         {audit.auditType}
                                     </Badge>
                                 </td>
-                                    <td className="p-4">{formatDate(audit.date)}</td>
-                                    <td className="p-4">
-                                        <div className="flex items-center">
-                                            {getStatusIcon(audit.status)}
-                                            <span className="ml-2">
+                                <td className="p-4">{formatDate(audit.date)}</td>
+                                <td className="p-4">
+                                    <div className="flex items-center">
+                                        {getStatusIcon(audit.status)}
+                                        <span className="ml-2">
                         {getStatusText(audit.status)}
                       </span>
-                                        </div>
-                                    </td>
+                                    </div>
+                                </td>
                                 <td className={`p-4 text-center font-medium ${getFindingCountColor(audit.findings)}`}>{audit.findings}</td>
-                                    <td className="p-4">
-                                        <div className="flex space-x-1">
-                                            <Link href={`/audit/${audit._id}`} onClick={() => logView("Audit", "Audit", audit._id.toString(), audit.name)}>
-                                                <Button title="Lihat" variant="ghost" size="icon">
-                                                    <Eye className="h-4 w-4" />
-                                                </Button>
-                                            </Link>
-                                            <Link href={`/audit/${audit._id}/edit`}>
-                                                <Button title="Edit" variant="ghost" size="icon">
-                                                    <Edit className="h-4 w-4" />
-                                                </Button>
-                                            </Link>
-                                        </div>
-                                    </td>
+                                <td className="p-4">
+                                    <div className="flex space-x-1">
+                                        <Link href={`/audit/${audit._id}`} onClick={() => logView("Audit", "Audit", audit._id.toString(), audit.name)}>
+                                            <Button title="Lihat" variant="ghost" size="icon">
+                                                <Eye className="h-4 w-4" />
+                                            </Button>
+                                        </Link>
+                                        <Link href={`/audit/${audit._id}/edit`}>
+                                            <Button title="Edit" variant="ghost" size="icon">
+                                                <Edit className="h-4 w-4" />
+                                            </Button>
+                                        </Link>
+                                    </div>
+                                </td>
                             </tr>
                         ))
-                        ) : (
+                    ) : (
                         <tr>
-                        <td
-                        colSpan={8}
-                    className="p-4 text-center text-muted-foreground"
-                    >
-                    Tidak ada data.
-                    </td>
-                </tr>
-                )}
-            </tbody>
-    </table>
-    </div>
-    );
+                            <td
+                                colSpan={8}
+                                className="p-4 text-center text-muted-foreground"
+                            >
+                                Tidak ada data.
+                            </td>
+                        </tr>
+                    )}
+                    </tbody>
+                </table>
+            </div>
+        );
     };
 
 
@@ -328,18 +328,22 @@ export default function AuditPage() {
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-                    {auditSummary.map((item) => (
-                        <Card key={item.title}>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm font-medium font-bold">
-                                    {item.title}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-2xl font-bold">{item.count}</p>
-                            </CardContent>
-                        </Card>
-                    ))}
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-base font-bold">Audit Internal</CardTitle><FileCheck className="h-4 w-4 text-blue-500" /></CardHeader>
+                        <CardContent><p className="text-2xl font-bold">{auditSummary.find(s => s.title === 'Audit Internal')?.count || 0}</p></CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-base font-bold">Audit Eksternal</CardTitle><FileCheck className="h-4 w-4 text-purple-500" /></CardHeader>
+                        <CardContent><p className="text-2xl font-bold">{auditSummary.find(s => s.title === 'Audit Eksternal')?.count || 0}</p></CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-base font-bold">Selesai</CardTitle><CheckCircle2 className="h-4 w-4 text-green-500" /></CardHeader>
+                        <CardContent><p className="text-2xl font-bold">{auditSummary.find(s => s.title === 'Selesai')?.count || 0}</p></CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-base font-bold">Total Finding</CardTitle><AlertTriangle className="h-4 w-4 text-amber-500" /></CardHeader>
+                        <CardContent><p className="text-2xl font-bold">{auditSummary.find(s => s.title === 'Total Finding')?.count || 0}</p></CardContent>
+                    </Card>
                 </div>
                 <Tabs defaultValue="all" className="w-full">
                     <TabsList className="mb-4 border-b overflow-x-auto">
@@ -384,7 +388,7 @@ export default function AuditPage() {
                     <TabsContent value="all">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="font-bold">Semua Jadwal Audit</CardTitle>
+                                <CardTitle className="text-base font-bold">Semua Jadwal Audit</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 {isLoading ? (
@@ -398,7 +402,7 @@ export default function AuditPage() {
                     <TabsContent value="internal">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="font-bold">Audit Internal</CardTitle>
+                                <CardTitle className="text-base font-bold">Audit Internal</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 {isLoading ? (
@@ -414,7 +418,7 @@ export default function AuditPage() {
                     <TabsContent value="external">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="font-bold">Audit Eksternal</CardTitle>
+                                <CardTitle className="text-base font-bold">Audit Eksternal</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 {isLoading ? (
@@ -431,7 +435,7 @@ export default function AuditPage() {
                     <TabsContent value="scheduled">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="font-bold flex items-center">
+                                <CardTitle className="text-base font-bold flex items-center">
                                     <Calendar className="mr-2 h-4 w-4" />Audit Dijadwalkan
                                 </CardTitle>
                             </CardHeader>
@@ -451,7 +455,7 @@ export default function AuditPage() {
                         <Card>
                             <CardHeader className="pb-2 flex flex-row items-center justify-between">
                                 <div>
-                                    <CardTitle className="font-bold">Audit Selesai</CardTitle>
+                                    <CardTitle className="text-base font-bold">Audit Selesai</CardTitle>
                                     <CardDescription>
                                         Daftar audit yang telah selesai dilaksanakan
                                     </CardDescription>
@@ -589,7 +593,7 @@ export default function AuditPage() {
                         <Card>
                             <CardHeader className="pb-4 flex flex-row items-center justify-between">
                                 <div>
-                                    <CardTitle className="font-bold">Finding Result</CardTitle>
+                                    <CardTitle className="text-base font-bold">Finding Result</CardTitle>
                                     <CardDescription>
                                         Daftar temuan dari semua audit.
                                     </CardDescription>
@@ -710,4 +714,4 @@ export default function AuditPage() {
             </div>
         </TooltipProvider>
     );
-    }
+}

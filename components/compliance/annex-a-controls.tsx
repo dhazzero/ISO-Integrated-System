@@ -95,7 +95,15 @@ const AnnexAControls = ({ controls: initialControls }: AnnexAControlsProps) => {
                                         {control.title || "-"}
                                     </td>
                                     <td className="py-3 px-4 text-sm">{control.standardName || '-'}</td>
-                                    <td className="py-3 px-4">{control.status ? <Badge>{control.status}</Badge> : <span>-</span>}</td>
+                                    <td className="py-3 px-4">{control.status ? <Badge variant={
+                                        (() => {
+                                            const s = control.status.toLowerCase();
+                                            if (s.includes("implemented") || s.includes("diterapkan")) return "default";
+                                            if (s.includes("not implemented") || s.includes("belum")) return "destructive";
+                                            if (s.includes("partial") || s.includes("sebagian")) return "secondary";
+                                            return "outline";
+                                        })()
+                                    }>{control.status}</Badge> : <span>-</span>}</td>
                                     <td className="py-3 px-4 text-sm">{control.effectiveness || '-'}</td>
                                     <td className="py-3 px-4 text-sm">
                                         {control.compliance ? <Badge variant="outline">{`${control.compliance}%`}</Badge> : '-'}

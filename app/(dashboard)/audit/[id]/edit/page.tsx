@@ -41,6 +41,8 @@ export default function EditAuditPage() {
     const [departments, setDepartments] = useState<Option[]>([]);
     const [selectedStandards, setSelectedStandards] = useState<string[]>([]);
     const [isLoadingOptions, setIsLoadingOptions] = useState(false);
+    const [certificationBody, setCertificationBody] = useState("");
+    const [externalAuditDepartment, setExternalAuditDepartment] = useState("");
 
     useEffect(() => {
         if (!auditId) return;
@@ -60,6 +62,13 @@ export default function EditAuditPage() {
                 auditData.date = new Date(auditData.date).toISOString().split('T')[0];
                 setFormData(auditData);
                 setSelectedStandards(Array.isArray(auditData.standard) ? auditData.standard : auditData.standard ? [auditData.standard] : []);
+
+                if (auditData.auditType === 'External' && auditData.department) {
+                    const bodyMatch = auditData.department.match(/Lembaga: (.*?),/);
+                    const deptMatch = auditData.department.match(/Departemen: (.*)/);
+                    if (bodyMatch) setCertificationBody(bodyMatch[1].trim());
+                    if (deptMatch) setExternalAuditDepartment(deptMatch[1].trim());
+                }
 
                 setStandards(await sRes.json());
                 setDepartments(await dRes.json());
@@ -81,7 +90,11 @@ export default function EditAuditPage() {
         e.preventDefault();
         setIsSaving(true);
         try {
-            const payload = { ...formData, standard: selectedStandards };
+            const finalDepartment = formData.auditType === 'External'
+                ? `Lembaga: ${certificationBody}, Departemen: ${externalAuditDepartment}`
+                : formData.department;
+
+            const payload = { ...formData, standard: selectedStandards, department: finalDepartment };
             const response = await fetch(`/api/audits/${auditId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -107,65 +120,65 @@ export default function EditAuditPage() {
                     <CardHeader><CardTitle>Edit Informasi Audit</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-2 gap-4"></div>
-                            <div className="space-y-2"><Label>Nama Audit</Label><Input value={formData.name || ''} onChange={e => handleInputChange('name', e.target.value)} /></div>
-                            <div className="space-y-2">
-                                <Label>Standar *</Label>
-                                <div className="space-y-2 max-h-40 overflow-y-auto border p-2 rounded-md">
-                                    {isLoadingOptions ? (
-                                        <p className="text-sm text-muted-foreground">Memuat standar...</p>
-                                    ) : standards.length > 0 ? (
-                                        standards.map((s) => (
-                                            <div key={s._id} className="flex items-center space-x-2">
-                                                <Checkbox
-                                                    id={`std-${s._id}`}
-                                                    checked={selectedStandards.includes(s.name)}
-                                                    onCheckedChange={(checked) =>
-                                                        setSelectedStandards((prev) =>
-                                                            checked ? [...prev, s.name] : prev.filter((name) => name !== s.name)
-                                                        )
-                                                    }
-                                                />
-                                                <Label htmlFor={`std-${s._id}`}>{s.name}</Label>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">Tidak ada standar yang ditemukan. Tambahkan di menu Pengaturan.</p>
-                                    )}
-                                </div>
+                        <div className="space-y-2"><Label>Nama Audit</Label><Input value={formData.name || ''} onChange={e => handleInputChange('name', e.target.value)} /></div>
+                        <div className="space-y-2">
+                            <Label>Standar *</Label>
+                            <div className="space-y-2 max-h-40 overflow-y-auto border p-2 rounded-md">
+                                {isLoadingOptions ? (
+                                    <p className="text-sm text-muted-foreground">Memuat standar...</p>
+                                ) : standards.length > 0 ? (
+                                    standards.map((s) => (
+                                        <div key={s._id} className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id={`std-${s._id}`}
+                                                checked={selectedStandards.includes(s.name)}
+                                                onCheckedChange={(checked) =>
+                                                    setSelectedStandards((prev) =>
+                                                        checked ? [...prev, s.name] : prev.filter((name) => name !== s.name)
+                                                    )
+                                                }
+                                            />
+                                            <Label htmlFor={`std-${s._id}`}>{s.name}</Label>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">Tidak ada standar yang ditemukan. Tambahkan di menu Pengaturan.</p>
+                                )}
                             </div>
-                            <div className="space-y-2"><Label>Jenis Audit</Label><Select value={formData.auditType} onValueChange={(v) => handleInputChange("auditType", v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="Internal">Internal</SelectItem><SelectItem value="External">Eksternal</SelectItem></SelectContent></Select></div>
-                            {formData.auditType === 'External' && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="tujuan">Tujuan Audit *</Label>
-                                    <Select
-                                        required
-                                        value={formData.tujuan || ''}
-                                        onValueChange={(v) => handleInputChange('tujuan', v)}
-                                    >
-                                        <SelectTrigger id="tujuan">
-                                            <SelectValue placeholder="Pilih tujuan" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Initial">Initial</SelectItem>
-                                            <SelectItem value="Surveillance">Surveillance</SelectItem>
-                                            <SelectItem value="Re-certification">Re-certification</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            )}
-                            {formData.auditType === 'External' ? (
+                        </div>
+                        <div className="space-y-2"><Label>Jenis Audit</Label><Select value={formData.auditType} onValueChange={(v) => handleInputChange("auditType", v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="Internal">Internal</SelectItem><SelectItem value="External">Eksternal</SelectItem></SelectContent></Select></div>
+                        {formData.auditType === 'External' && (
+                            <div className="space-y-2">
+                                <Label htmlFor="tujuan">Tujuan Audit *</Label>
+                                <Select
+                                    required
+                                    value={formData.tujuan || ''}
+                                    onValueChange={(v) => handleInputChange('tujuan', v)}
+                                >
+                                    <SelectTrigger id="tujuan">
+                                        <SelectValue placeholder="Pilih tujuan" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Initial">Initial</SelectItem>
+                                        <SelectItem value="Surveillance">Surveillance</SelectItem>
+                                        <SelectItem value="Re-certification">Re-certification</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+                        {formData.auditType === 'External' ? (
+                            <>
                                 <div className="space-y-2">
                                     <Label>Lembaga Sertifikasi *</Label>
                                     <Input
-                                        value={formData.department || ''}
-                                        onChange={e => handleInputChange('department', e.target.value)}
+                                        value={certificationBody}
+                                        onChange={e => setCertificationBody(e.target.value)}
                                         required
                                     />
                                 </div>
-                            ) : (
                                 <div className="space-y-2">
-                                    <Label>Departemen *</Label>
-                                    <Select required value={formData.department || ''} onValueChange={v => handleInputChange('department', v)}>
+                                    <Label>Departemen yang Diaudit *</Label>
+                                    <Select required value={externalAuditDepartment} onValueChange={setExternalAuditDepartment}>
                                         <SelectTrigger>
                                             <SelectValue placeholder={isLoadingOptions ? 'Memuat...' : 'Pilih departemen'} />
                                         </SelectTrigger>
@@ -179,7 +192,25 @@ export default function EditAuditPage() {
                                         </SelectContent>
                                     </Select>
                                 </div>
-                            )}
+                            </>
+                        ) : (
+                            <div className="space-y-2">
+                                <Label>Departemen *</Label>
+                                <Select required value={formData.department || ''} onValueChange={v => handleInputChange('department', v)}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder={isLoadingOptions ? 'Memuat...' : 'Pilih departemen'} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {isLoadingOptions ? (
+                                            <SelectItem value="loading" disabled>Memuat...</SelectItem>
+                                        ) : (
+                                            departments.map(d => <SelectItem key={d._id} value={d.name}>{d.name}</SelectItem>)
+                                        )}
+                                        <SelectItem value="Semua Departemen">Semua Departemen</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
                 <div className="flex justify-end mt-6">

@@ -56,6 +56,7 @@ export function AddAuditModal({ onAddAudit, type }: AddAuditModalProps) {
         auditor: "",
         scheduledTime: "",
     })
+    const [externalAuditDepartment, setExternalAuditDepartment] = useState<string>("")
 
     useEffect(() => {
         if (!open) return
@@ -91,6 +92,9 @@ export function AddAuditModal({ onAddAudit, type }: AddAuditModalProps) {
         try {
             const payload = {
                 ...formData,
+                department: formData.auditType === 'External'
+                    ? `Lembaga: ${formData.department}, Departemen: ${externalAuditDepartment}`
+                    : formData.department,
                 standard: selectedStandards,
                 status: type === "scheduled" ? "Scheduled" : "Completed",
                 findings: 0,
@@ -111,19 +115,19 @@ export function AddAuditModal({ onAddAudit, type }: AddAuditModalProps) {
             setOpen(false)
             setSelectedStandards([])
             setFormData({
-        name: "",
-        department: "",
-        auditType: "Internal",
-        tujuan: "",
-        date: "",
-        auditor: "",
-        scheduledTime: "",
+                name: "",
+                department: "",
+                auditType: "Internal",
+                tujuan: "",
+                date: "",
+                auditor: "",
+                scheduledTime: "",
             })
         } catch (err) {
             toast({ variant: "destructive", title: "Terjadi Kesalahan", description: (err as Error).message })
         } finally {
             setIsLoading(false)
-    }
+        }
     }
 
     return (
@@ -196,17 +200,36 @@ export function AddAuditModal({ onAddAudit, type }: AddAuditModalProps) {
                                 </Select>
                             </div>
                         )}
-                        {formData.auditType === "External" ? (
+                        {formData.auditType === "External" && (
                             <div className="space-y-2">
-                                <Label htmlFor="department">Lembaga Sertifikasi *</Label>
+                                <Label htmlFor="department_external_body">Lembaga Sertifikasi *</Label>
                                 <Input
-                                    id="department"
+                                    id="department_external_body"
                                     value={formData.department}
                                     onChange={e => handleInputChange("department", e.target.value)}
                                     required
                                 />
                             </div>
-                        ) : (
+                        )}
+                        {formData.auditType === "External" && (
+                            <div className="space-y-2">
+                                <Label htmlFor="department_external">Departemen yang Diaudit *</Label>
+                                <Select required value={externalAuditDepartment} onValueChange={setExternalAuditDepartment}>
+                                    <SelectTrigger id="department_external">
+                                        <SelectValue placeholder={isLoadingOptions ? "Memuat..." : "Pilih departemen"} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {isLoadingOptions ? (
+                                            <SelectItem value="loading" disabled>Memuat...</SelectItem>
+                                        ) : (
+                                            departments.map(d => <SelectItem key={d._id} value={d.name}>{d.name}</SelectItem>)
+                                        )}
+                                        <SelectItem value="Semua Departemen">Semua Departemen</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+                        {formData.auditType === "Internal" && (
                             <div className="space-y-2">
                                 <Label htmlFor="department">Departemen *</Label>
                                 <Select required value={formData.department} onValueChange={v => handleInputChange("department", v)}>
