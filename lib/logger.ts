@@ -1,12 +1,59 @@
 // lib/logger.ts
-export const logActivity = async (action: string, module: string, description: string) => {
+// Enhanced activity logging function for security audit trail
+
+interface LogDetails {
+    entityId?: string;
+    entityName?: string;
+    changes?: Record<string, unknown>;
+    [key: string]: unknown;
+}
+
+export const logActivity = async (
+    action: string,
+    module: string,
+    description: string,
+    details?: LogDetails
+) => {
     try {
         await fetch('/api/logs/security', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action, module, description }),
+            body: JSON.stringify({
+                action,
+                module,
+                description,
+                details: details || null,
+            }),
         });
     } catch (error) {
         console.error("Failed to log activity:", error);
     }
 };
+
+// Predefined action types for consistency
+export const LogAction = {
+    CREATE: 'CREATE',
+    UPDATE: 'UPDATE',
+    DELETE: 'DELETE',
+    LOGIN: 'LOGIN',
+    LOGOUT: 'LOGOUT',
+    VIEW: 'VIEW',
+    EXPORT: 'EXPORT',
+    IMPORT: 'IMPORT',
+} as const;
+
+// Predefined module types for consistency
+export const LogModule = {
+    USER: 'Pengguna',
+    DEPARTMENT: 'Departemen',
+    APPROVER: 'Approval',
+    STANDARD: 'Standar ISO',
+    SETTINGS: 'Pengaturan',
+    SYSTEM: 'Sistem',
+    SECURITY: 'Keamanan',
+    ORGANIZATION: 'Organisasi',
+    DOCUMENT: 'Dokumen',
+    AUDIT: 'Audit',
+    CAPA: 'CAPA',
+    RISK: 'Risiko',
+} as const;

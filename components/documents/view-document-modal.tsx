@@ -12,15 +12,36 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { FileText, Download, Edit, Calendar, User, Building, Tag, Clock, CheckCircle, AlertCircle } from "lucide-react"
+import { FilePreview } from "@/components/documents/file-preview"
 
 interface ViewDocumentModalProps {
   isOpen: boolean
   onClose: () => void
   document: any
   onEdit: (doc: any) => void
+  canEdit?: boolean // Permission to show edit button
 }
 
-export function ViewDocumentModal({ isOpen, onClose, document, onEdit }: ViewDocumentModalProps) {
+// Helper function to format date in readable format
+const formatDate = (dateString: string | null | undefined): string => {
+  if (!dateString) return "-";
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+  } catch {
+    return dateString;
+  }
+};
+
+export function ViewDocumentModal({ isOpen, onClose, document, onEdit, canEdit = true }: ViewDocumentModalProps) {
   if (!document) return null
 
   const getStatusBadge = (status: string) => {
@@ -61,7 +82,8 @@ export function ViewDocumentModal({ isOpen, onClose, document, onEdit }: ViewDoc
   const handleDownload = () => {
     if (!document.fileId) return
 
-    const link = document.createElement("a")
+    // Use window.document to avoid shadowing by local 'document' prop
+    const link = window.document.createElement("a")
     link.href = `/api/files/${document.fileId}`
     link.target = "_blank"
     link.download = document.name
@@ -116,7 +138,7 @@ export function ViewDocumentModal({ isOpen, onClose, document, onEdit }: ViewDoc
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Terakhir Diperbarui</p>
-                  <p className="text-sm text-muted-foreground">{document.updatedAt}</p>
+                  <p className="text-sm text-muted-foreground">{formatDate(document.updatedAt)}</p>
                 </div>
               </div>
 
@@ -124,7 +146,7 @@ export function ViewDocumentModal({ isOpen, onClose, document, onEdit }: ViewDoc
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <div>
                   <p className="text-sm font-medium">Review Berikutnya</p>
-                  <p className="text-sm text-muted-foreground">{document.nextReview}</p>
+                  <p className="text-sm text-muted-foreground">{formatDate(document.nextReview)}</p>
                 </div>
               </div>
             </div>
@@ -188,15 +210,12 @@ export function ViewDocumentModal({ isOpen, onClose, document, onEdit }: ViewDoc
           <div>
             <h3 className="font-medium mb-3">Preview Dokumen</h3>
             {document.fileId ? (
-              <iframe
-                src={`/api/files/${document.fileId}?inline=1`}
-                className="w-full h-96 border rounded"
-              />
+              <FilePreview fileId={document.fileId} canEdit={canEdit} />
             ) : (
               <div className="border rounded-lg p-8 text-center bg-gray-50">
                 <FileText className="mx-auto h-16 w-16 text-gray-400 mb-4" />
                 <p className="text-sm text-muted-foreground mb-2">Preview dokumen tidak tersedia</p>
-                <p className="text-xs text-muted-foreground">Klik download untuk melihat dokumen lengkap</p>
+                <p className="text-xs text-muted-foreground">Tidak ada file yang terlampir</p>
               </div>
             )}
           </div>
@@ -206,14 +225,18 @@ export function ViewDocumentModal({ isOpen, onClose, document, onEdit }: ViewDoc
           <Button variant="outline" onClick={onClose}>
             Tutup
           </Button>
-          <Button variant="outline" onClick={handleEdit}>
-            <Edit className="mr-2 h-4 w-4" />
-            Edit
-          </Button>
-          <Button onClick={handleDownload}>
-            <Download className="mr-2 h-4 w-4" />
-            Download
-          </Button>
+          {canEdit && (
+            <Button variant="outline" onClick={handleEdit}>
+              <Edit className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+          )}
+          {canEdit && (
+            <Button onClick={handleDownload}>
+              <Download className="mr-2 h-4 w-4" />
+              Download
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

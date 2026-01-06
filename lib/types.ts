@@ -1,11 +1,13 @@
 import { ObjectId } from 'mongodb';
 
 // Enum untuk Role Pengguna untuk konsistensi
+// Hierarchy: SUPERUSER > ADMINISTRATOR > MANAGER > STAFF/AUDITOR
 export enum UserRole {
+    SUPERUSER = 'superuser',
     ADMINISTRATOR = 'administrator',
     MANAGER = 'manager',
     STAFF = 'staff',
-    AUDITOR = 'auditor', // Menambahkan role dari data contoh
+    AUDITOR = 'auditor',
 }
 
 export interface User {
@@ -19,6 +21,8 @@ export interface User {
     supervisorId: ObjectId | null; // Referensi ke atasan (User lain)
     status: 'active' | 'inactive' | 'pending';
     lastLogin: Date | null;
+    failedLoginAttempts: number; // Track failed login attempts
+    lockedAt: Date | null; // Timestamp when account was locked due to failed attempts
     createdAt: Date;
     updatedAt: Date;
 }
@@ -35,7 +39,7 @@ export interface Department {
 export interface Approver {
     _id: string; // Bisa ObjectId jika dari MongoDB
     title: string;
-    name:string;
+    name: string;
 }
 
 export interface Standard {
@@ -48,11 +52,14 @@ export interface Standard {
 }
 
 export interface SecurityLog {
-    _id: string; // Bisa ObjectId jika dari MongoDB
-    timestamp: string; // Seharusnya Date
+    _id: string;
+    timestamp: string | Date;
     action: string;
     module: string;
     description: string;
-    user: string;
+    userId?: string | null;
+    userName: string;
+    userRole?: string | null;
     ip: string;
+    details?: Record<string, unknown> | null;
 }

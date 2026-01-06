@@ -29,6 +29,7 @@ interface Risk {
 export default function RiskPage() {
     const [risks, setRisks] = useState<Risk[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [userCanEdit, setUserCanEdit] = useState(false);
     const { toast } = useToast();
     const [deleteConfirm, setDeleteConfirm] = useState({ open: false, id: null as string | null, name: "" });
 
@@ -48,6 +49,11 @@ export default function RiskPage() {
 
     useEffect(() => {
         fetchRisks();
+        // Check user permission from API
+        fetch('/api/auth/me').then(res => res.json()).then(data => {
+            // Use permissions.canEdit from API - this respects the central auth system
+            setUserCanEdit(data?.permissions?.canEdit || false);
+        }).catch(() => setUserCanEdit(false));
     }, []);
 
     const riskSummary = useMemo(() => {
@@ -66,7 +72,7 @@ export default function RiskPage() {
     }, [risks]);
 
     const handleRiskAdded = () => {
-        toast({ title: "Sukses", description: "Daftar risiko sedang diperbarui..."});
+        toast({ title: "Sukses", description: "Daftar risiko sedang diperbarui..." });
         fetchRisks();
     };
 
@@ -119,9 +125,11 @@ export default function RiskPage() {
             <div className="container mx-auto px-4 py-6">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-bold">Manajemen Risiko</h1>
-                    <div className="flex space-x-2">
-                        <AddRiskModal onRiskAdded={handleRiskAdded} />
-                    </div>
+                    {userCanEdit && (
+                        <div className="flex space-x-2">
+                            <AddRiskModal onRiskAdded={handleRiskAdded} />
+                        </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -148,61 +156,65 @@ export default function RiskPage() {
                                 <thead><tr className="border-b"><th className="text-left py-3 px-4">Nama Risiko</th><th className="text-left py-3 px-4">Standar Terkait</th><th className="text-left py-3 px-4">Level</th><th className="text-left py-3 px-4">Kemungkinan</th><th className="text-left py-3 px-4">Dampak</th><th className="text-left py-3 px-4">Status</th><th className="text-left py-3 px-4">Tindakan</th></tr></thead>
                                 {/* ----------------------------- */}
                                 <tbody>
-                                {isLoading ? (
-                                    <tr><td colSpan={8} className="text-center p-8">Memuat data risiko...</td></tr>
-                                ) : risks.length === 0 ? (
-                                    <tr><td colSpan={8} className="text-center p-8 text-muted-foreground">Belum ada risiko yang ditambahkan.</td></tr>
-                                ) : (
-                                    risks.map((risk) => (
-                                        <tr key={risk._id} className="border-b hover:bg-muted/50">
-                                            <td className="py-3 px-4 flex items-center"><AlertTriangle className={`mr-2 h-4 w-4 ${getLevelColor(risk.level)}`} /><Link href={`/risk/${risk._id}`} className="hover:underline">{risk.name}</Link></td>
+                                    {isLoading ? (
+                                        <tr><td colSpan={8} className="text-center p-8">Memuat data risiko...</td></tr>
+                                    ) : risks.length === 0 ? (
+                                        <tr><td colSpan={8} className="text-center p-8 text-muted-foreground">Belum ada risiko yang ditambahkan.</td></tr>
+                                    ) : (
+                                        risks.map((risk) => (
+                                            <tr key={risk._id} className="border-b hover:bg-muted/50">
+                                                <td className="py-3 px-4 flex items-center"><AlertTriangle className={`mr-2 h-4 w-4 ${getLevelColor(risk.level)}`} /><Link href={`/risk/${risk._id}`} className="hover:underline">{risk.name}</Link></td>
 
-                                            {/* --- TAMBAHKAN CELL BARU INI --- */}
-                                            <td className="py-3 px-4">
-                                                <div className="flex flex-wrap items-center gap-1">
-                                                    {(risk.relatedStandards && risk.relatedStandards.length > 0) ? (
-                                                        <>
-                                                            {risk.relatedStandards.slice(0, 2).map(std => (
-                                                                <Badge key={std} variant="secondary">{std}</Badge>
-                                                            ))}
-                                                            {risk.relatedStandards.length > 2 && (
-                                                                <Tooltip>
-                                                                    <TooltipTrigger>
-                                                                        <Badge variant="outline">
-                                                                            +{risk.relatedStandards.length - 2} lagi...
-                                                                        </Badge>
-                                                                    </TooltipTrigger>
-                                                                    <TooltipContent>
-                                                                        <div className="flex flex-col gap-1 p-1">
-                                                                            {risk.relatedStandards.slice(2).map(std => (
-                                                                                <span key={std} className="text-xs">{std}</span>
-                                                                            ))}
-                                                                        </div>
-                                                                    </TooltipContent>
-                                                                </Tooltip>
-                                                            )}
-                                                        </>
-                                                    ) : (
-                                                        <span className="text-xs text-muted-foreground">-</span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            {/* ------------------------------- */}
+                                                {/* --- TAMBAHKAN CELL BARU INI --- */}
+                                                <td className="py-3 px-4">
+                                                    <div className="flex flex-wrap items-center gap-1">
+                                                        {(risk.relatedStandards && risk.relatedStandards.length > 0) ? (
+                                                            <>
+                                                                {risk.relatedStandards.slice(0, 2).map(std => (
+                                                                    <Badge key={std} variant="secondary">{std}</Badge>
+                                                                ))}
+                                                                {risk.relatedStandards.length > 2 && (
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger>
+                                                                            <Badge variant="outline">
+                                                                                +{risk.relatedStandards.length - 2} lagi...
+                                                                            </Badge>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>
+                                                                            <div className="flex flex-col gap-1 p-1">
+                                                                                {risk.relatedStandards.slice(2).map(std => (
+                                                                                    <span key={std} className="text-xs">{std}</span>
+                                                                                ))}
+                                                                            </div>
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                )}
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">-</span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                {/* ------------------------------- */}
 
-                                            <td className={`py-3 px-4 font-semibold ${getLevelColor(risk.level)}`}>{risk.level}</td>
-                                            <td className="py-3 px-4">{risk.likelihood}</td>
-                                            <td className="py-3 px-4">{risk.impact}</td>
-                                            <td className="py-3 px-4">{getStatusBadge(risk.status)}</td>
-                                            <td className="py-3 px-4">
-                                                <div className="flex space-x-1">
-                                                    <Link href={`/risk/${risk._id}`}><Button variant="ghost" size="icon"><Eye className="h-4 w-4" /></Button></Link>
-                                                    <Link href={`/risk/${risk._id}/edit`}><Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button></Link>
-                                                    <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(risk)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
+                                                <td className={`py-3 px-4 font-semibold ${getLevelColor(risk.level)}`}>{risk.level}</td>
+                                                <td className="py-3 px-4">{risk.likelihood}</td>
+                                                <td className="py-3 px-4">{risk.impact}</td>
+                                                <td className="py-3 px-4">{getStatusBadge(risk.status)}</td>
+                                                <td className="py-3 px-4">
+                                                    <div className="flex space-x-1">
+                                                        <Link href={`/risk/${risk._id}`}><Button variant="ghost" size="icon"><Eye className="h-4 w-4" /></Button></Link>
+                                                        {userCanEdit && (
+                                                            <>
+                                                                <Link href={`/risk/${risk._id}/edit`}><Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button></Link>
+                                                                <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(risk)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
                                 </tbody>
                             </table>
                         </div>

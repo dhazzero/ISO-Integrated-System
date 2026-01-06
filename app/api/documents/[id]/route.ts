@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import { ObjectId, GridFSBucket } from 'mongodb';
+import { logActivityServer, LogAction, LogModule } from '@/lib/server-logger';
 
 const COLLECTION_NAME = 'documents';
 
@@ -12,20 +13,37 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     const { id } = params;
     const { db } = await connectToDatabase();
 
-
     if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json({ message: 'Invalid document id' }, { status: 400 });
     }
     const _id = new ObjectId(id);
 
-    // Membaca body request sebagai JSON, sesuai alur asli Anda
-    const updateData = await request.json();
-
-    // 1. Temukan dokumen yang ada untuk mendapatkan fileId lama
+    // 1. Temukan dokumen yang ada untuk mendapatkan fileId lama dan departemen
     const existingDoc = await db.collection(COLLECTION_NAME).findOne({ _id });
     if (!existingDoc) {
       return NextResponse.json({ message: 'Document not found' }, { status: 404 });
     }
+
+    // Authorization check - only SUPERUSER, ADMIN, MANAGER (own dept) can edit
+    const { canEdit, unauthorizedEditResponse, departmentMismatchResponse, getCurrentUser } = await import('@/lib/auth');
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check edit permission with department validation for MANAGER
+    const docDepartmentId = existingDoc.department || existingDoc.departmentId;
+    if (!(await canEdit(docDepartmentId))) {
+      // MANAGER trying to edit different department
+      if (currentUser.userRole === 'manager') {
+        return NextResponse.json(departmentMismatchResponse(), { status: 403 });
+      }
+      return NextResponse.json(unauthorizedEditResponse(), { status: 403 });
+    }
+
+    // Membaca body request sebagai JSON, sesuai alur asli Anda
+    const updateData = await request.json();
 
     // 2. Cek jika frontend mengirim fileId baru (artinya ada file baru yang diupload)
     if (updateData.fileId && updateData.fileId !== existingDoc.fileId?.toString()) {
@@ -43,36 +61,37 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
     // 3. Setel waktu pembaruan
     updateData.updatedAt = new Date();
+    updateData.updatedBy = currentUser.userName;
 
-    // 4. ===== INI ADALAH PERBAIKAN UTAMA =====
-    // Hapus field _id dan id dari objek updateData sebelum dikirim ke database.
-    // Ini mencegah error "immutable field" dari MongoDB.
+    // 4. Hapus field _id dan id dari objek updateData sebelum dikirim ke database.
     delete updateData._id;
     delete updateData.id;
-    // =========================================
 
     // 5. Lakukan update pada dokumen
     const result = await db.collection(COLLECTION_NAME).findOneAndUpdate(
-        { _id },
-        { $set: updateData },
-        { returnDocument: 'after' }
+      { _id },
+      { $set: updateData },
+      { returnDocument: 'after' }
     );
 
     // Cek jika operasi update berhasil
     if (!result) {
-      // Ini akan jarang terjadi jika `existingDoc` ditemukan, tapi ini adalah pengaman
-      throw new Error('Document not found during the update operation. It might have been deleted just now.');
+      throw new Error('Document not found during the update operation.');
     }
 
-    // 6. Log perubahan
-    await db.collection('documentLogs').insertOne({
-      documentId: id,
-      action: 'UPDATE',
-      user: updateData.updatedBy || 'admin', // Asumsi ada field updatedBy dari frontend
-      timestamp: new Date(),
-      before: existingDoc, // Dokumen sebelum diubah
-      after: result,      // Dokumen setelah diubah
-    });
+    // 6. Log activity ke security_logs
+    const docName = result.name || existingDoc.name || id;
+    await logActivityServer(
+      LogAction.UPDATE,
+      LogModule.DOCUMENT,
+      `Memperbarui dokumen: ${docName}`,
+      {
+        entityId: id,
+        entityName: docName,
+        documentType: result.type || existingDoc.type,
+      },
+      request.headers.get('x-forwarded-for') || undefined
+    );
 
     // 7. Kembalikan dokumen yang telah diperbarui
     return NextResponse.json(result);
@@ -83,9 +102,21 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-// Fungsi DELETE (biarkan seperti yang sudah ada, atau gunakan versi ini untuk konsistensi)
+// Fungsi DELETE
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
+    // Authorization check - only SUPERUSER can delete
+    const { canDelete, unauthorizedDeleteResponse, getCurrentUser } = await import('@/lib/auth');
+    const currentUser = await getCurrentUser();
+
+    if (!currentUser) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!(await canDelete())) {
+      return NextResponse.json(unauthorizedDeleteResponse(), { status: 403 });
+    }
+
     const { id } = params;
     const { db } = await connectToDatabase();
     if (!id || !ObjectId.isValid(id)) {
@@ -98,17 +129,25 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       return NextResponse.json({ message: 'Document not found' }, { status: 404 });
     }
 
+    // Delete the document
     await db.collection(COLLECTION_NAME).deleteOne({ _id });
 
-    await db.collection('documentLogs').insertOne({
-      documentId: id,
-      action: 'DELETE',
-      user: 'admin', // Ganti dengan info user yang login
-      timestamp: new Date(),
-      before: document,
-      after: null
-    });
+    // Log activity ke security_logs
+    const docName = document.name || id;
+    await logActivityServer(
+      LogAction.DELETE,
+      LogModule.DOCUMENT,
+      `Menghapus dokumen: ${docName}`,
+      {
+        entityId: id,
+        entityName: docName,
+        documentType: document.type,
+        fileName: document.fileName,
+      },
+      request.headers.get('x-forwarded-for') || undefined
+    );
 
+    // Delete associated file from GridFS
     if (document.fileId) {
       try {
         const bucket = new GridFSBucket(db, { bucketName: 'uploads' });

@@ -28,6 +28,16 @@ interface Department {
   name: string;
 }
 
+interface CurrentUser {
+  _id: string;
+  role: string;
+  departmentId?: string;
+  departmentName?: string;
+}
+
+// Roles yang bisa akses semua departemen
+const ALL_DEPARTMENT_ACCESS_ROLES = ['superuser', 'administrator', 'auditor'];
+
 interface EditDocumentModalProps {
   isOpen: boolean
   onClose: () => void
@@ -48,6 +58,7 @@ export function EditDocumentModal({ isOpen, onClose, document, onUpdated }: Edit
   const [standardOptions, setStandardOptions] = useState<Standard[]>([]);
   const [departmentOptions, setDepartmentOptions] = useState<Department[]>([]);
   const [isLoadingOptions, setIsLoadingOptions] = useState(false);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
 
   useEffect(() => {
     if (document) {
@@ -70,6 +81,14 @@ export function EditDocumentModal({ isOpen, onClose, document, onUpdated }: Edit
       const fetchOptions = async () => {
         setIsLoadingOptions(true);
         try {
+          // Fetch current user first
+          const userRes = await fetch('/api/auth/me');
+          let user: CurrentUser | null = null;
+          if (userRes.ok) {
+            user = await userRes.json();
+            setCurrentUser(user);
+          }
+
           const [approverRes, standardRes, departmentRes] = await Promise.all([
             fetch('/api/settings/approvers'),
             fetch('/api/settings/standards'),
@@ -79,7 +98,22 @@ export function EditDocumentModal({ isOpen, onClose, document, onUpdated }: Edit
 
           setApproverOptions(await approverRes.json());
           setStandardOptions(await standardRes.json());
-          setDepartmentOptions(await departmentRes.json());
+
+          // Get all departments
+          const allDepartments: Department[] = await departmentRes.json();
+
+          // Filter departments based on user role
+          if (user && ALL_DEPARTMENT_ACCESS_ROLES.includes(user.role)) {
+            // Superuser, Administrator, Auditor can see all departments
+            setDepartmentOptions(allDepartments);
+          } else if (user?.departmentName) {
+            // Manager and Staff can only see their own department
+            const userDept = allDepartments.filter(dept => dept.name === user.departmentName);
+            setDepartmentOptions(userDept);
+          } else {
+            // Fallback: show all if no department assigned
+            setDepartmentOptions(allDepartments);
+          }
         } catch (error) {
           console.error("Failed to fetch dropdown options:", error);
         } finally {
@@ -133,62 +167,62 @@ export function EditDocumentModal({ isOpen, onClose, document, onUpdated }: Edit
     switch (documentType) {
       case "Kebijakan":
         return (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="editApprover">Approver</Label>
-                <Select value={formData.approver} onValueChange={(value) => setFormData({ ...formData, approver: value })}>
-                  <SelectTrigger id="editApprover">
-                    <SelectValue placeholder={isLoadingOptions ? "Memuat..." : "Pilih approver"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {approverOptions.map((approver) => (
-                        <SelectItem key={approver._id} value={approver.title}>
-                          {approver.title}
-                        </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="editScope">Ruang Lingkup</Label>
-                <Select value={formData.scope} onValueChange={(value) => setFormData({ ...formData, scope: value })}>
-                  <SelectTrigger id="editScope">
-                    <SelectValue placeholder={isLoadingOptions ? "Memuat..." : "Pilih standar"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {standardOptions.map((standard) => (
-                        <SelectItem key={standard._id} value={standard.name}>
-                          {standard.name}
-                        </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="editApprover">Approver</Label>
+              <Select value={formData.approver} onValueChange={(value) => setFormData({ ...formData, approver: value })}>
+                <SelectTrigger id="editApprover">
+                  <SelectValue placeholder={isLoadingOptions ? "Memuat..." : "Pilih approver"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {approverOptions.map((approver) => (
+                    <SelectItem key={approver._id} value={approver.title}>
+                      {approver.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+            <div>
+              <Label htmlFor="editScope">Ruang Lingkup</Label>
+              <Select value={formData.scope} onValueChange={(value) => setFormData({ ...formData, scope: value })}>
+                <SelectTrigger id="editScope">
+                  <SelectValue placeholder={isLoadingOptions ? "Memuat..." : "Pilih standar"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {standardOptions.map((standard) => (
+                    <SelectItem key={standard._id} value={standard.name}>
+                      {standard.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         );
 
       case "Prosedur":
       case "Instruksi Kerja":
         return (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="owner">Process Owner / PIC</Label>
-                <Input id="owner" value={formData.owner} onChange={(e) => setFormData({ ...formData, owner: e.target.value })} placeholder="Nama penanggung jawab" />
-              </div>
-              <div>
-                <Label htmlFor="department">Departemen</Label>
-                <Select required value={formData.department} onValueChange={(value) => setFormData({ ...formData, department: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={isLoadingOptions ? "Memuat..." : "Pilih departemen"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departmentOptions.map((dept) => (
-                        <SelectItem key={dept._id} value={dept.name}>{dept.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="owner">Process Owner / PIC</Label>
+              <Input id="owner" value={formData.owner} onChange={(e) => setFormData({ ...formData, owner: e.target.value })} placeholder="Nama penanggung jawab" />
             </div>
+            <div>
+              <Label htmlFor="department">Departemen</Label>
+              <Select required value={formData.department} onValueChange={(value) => setFormData({ ...formData, department: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder={isLoadingOptions ? "Memuat..." : "Pilih departemen"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {departmentOptions.map((dept) => (
+                    <SelectItem key={dept._id} value={dept.name}>{dept.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         );
       default:
         return null;
@@ -196,94 +230,94 @@ export function EditDocumentModal({ isOpen, onClose, document, onUpdated }: Edit
   };
 
   return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit {documentType}</DialogTitle>
-            <DialogDescription>Perbarui informasi {documentType.toLowerCase()}</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="name">Nama Dokumen</Label>
-                <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
-              </div>
-              <div>
-                <Label htmlFor="version">Versi</Label>
-                <Input id="version" value={formData.version} onChange={(e) => setFormData({ ...formData, version: e.target.value })} />
-              </div>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit {documentType}</DialogTitle>
+          <DialogDescription>Perbarui informasi {documentType.toLowerCase()}</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="name">Nama Dokumen</Label>
+              <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
             </div>
             <div>
-              <Label htmlFor="description">Deskripsi</Label>
-              <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} />
+              <Label htmlFor="version">Versi</Label>
+              <Input id="version" value={formData.version} onChange={(e) => setFormData({ ...formData, version: e.target.value })} />
             </div>
-            {getDocumentTypeFields()}
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="status">Status</Label>
-                <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Draft">Draft</SelectItem>
-                    <SelectItem value="Review">Review</SelectItem>
-                    <SelectItem value="Aktif">Aktif</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="effectiveDate">Tanggal Efektif</Label>
-                <Input id="effectiveDate" type="date" value={formData.effectiveDate} onChange={(e) => setFormData({ ...formData, effectiveDate: e.target.value })} />
-              </div>
-              <div>
-                <Label htmlFor="reviewDate">Tanggal Review</Label>
-                <Input id="reviewDate" type="date" value={formData.reviewDate} onChange={(e) => setFormData({ ...formData, reviewDate: e.target.value })} />
-              </div>
+          </div>
+          <div>
+            <Label htmlFor="description">Deskripsi</Label>
+            <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} />
+          </div>
+          {getDocumentTypeFields()}
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="status">Status</Label>
+              <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Draft">Draft</SelectItem>
+                  <SelectItem value="Review">Review</SelectItem>
+                  <SelectItem value="Aktif">Aktif</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
-              <Label htmlFor="file-upload">Upload File Baru (Opsional)</Label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                <div className="mt-4">
-                  <label htmlFor="file-upload" className="cursor-pointer">
+              <Label htmlFor="effectiveDate">Tanggal Efektif</Label>
+              <Input id="effectiveDate" type="date" value={formData.effectiveDate} onChange={(e) => setFormData({ ...formData, effectiveDate: e.target.value })} />
+            </div>
+            <div>
+              <Label htmlFor="reviewDate">Tanggal Review</Label>
+              <Input id="reviewDate" type="date" value={formData.reviewDate} onChange={(e) => setFormData({ ...formData, reviewDate: e.target.value })} />
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="file-upload">Upload File Baru (Opsional)</Label>
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+              <Upload className="mx-auto h-12 w-12 text-gray-400" />
+              <div className="mt-4">
+                <label htmlFor="file-upload" className="cursor-pointer">
                   <span className="mt-2 block text-sm font-medium text-gray-900">
                     Drag dan drop atau klik untuk mengganti file
                   </span>
-                    <input id="file-upload" type="file" className="sr-only" accept=".pdf,.doc,.docx,.xls,.xlsx" onChange={handleFileChange} />
-                  </label>
-                  <p className="mt-1 text-xs text-gray-500">Jika tidak ada file baru yang dipilih, file lama akan tetap digunakan.</p>
+                  <input id="file-upload" type="file" className="sr-only" accept=".pdf,.doc,.docx,.xls,.xlsx" onChange={handleFileChange} />
+                </label>
+                <p className="mt-1 text-xs text-gray-500">Jika tidak ada file baru yang dipilih, file lama akan tetap digunakan.</p>
+              </div>
+            </div>
+            {!selectedFile && document?.fileId && (
+              <div className="mt-4">
+                <Label>File saat ini:</Label>
+                <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                  <div className="flex items-center">
+                    <FileText className="h-4 w-4 mr-2" />
+                    <a href={`/api/files/${document.fileId}?inline=1`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-sm">Lihat file</a>
+                  </div>
                 </div>
               </div>
-              {!selectedFile && document?.fileId && (
-                  <div className="mt-4">
-                    <Label>File saat ini:</Label>
-                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <div className="flex items-center">
-                        <FileText className="h-4 w-4 mr-2" />
-                        <a href={`/api/files/${document.fileId}?inline=1`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-sm">Lihat file</a>
-                      </div>
-                    </div>
+            )}
+            {selectedFile && (
+              <div className="mt-4">
+                <Label>File baru yang akan diupload:</Label>
+                <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                  <div className="flex items-center">
+                    <FileText className="h-4 w-4 mr-2" />
+                    <span className="text-sm">{selectedFile.name}</span>
+                    <Badge variant="secondary" className="ml-2">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</Badge>
                   </div>
-              )}
-              {selectedFile && (
-                  <div className="mt-4">
-                    <Label>File baru yang akan diupload:</Label>
-                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <div className="flex items-center">
-                        <FileText className="h-4 w-4 mr-2" />
-                        <span className="text-sm">{selectedFile.name}</span>
-                        <Badge variant="secondary" className="ml-2">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</Badge>
-                      </div>
-                      <Button variant="ghost" size="icon" onClick={removeFile}><X className="h-4 w-4" /></Button>
-                    </div>
-                  </div>
-              )}
-            </div>
+                  <Button variant="ghost" size="icon" onClick={removeFile}><X className="h-4 w-4" /></Button>
+                </div>
+              </div>
+            )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={onClose} disabled={saving}>Batal</Button>
-            <Button onClick={handleSave} disabled={saving}>{saving ? "Menyimpan..." : "Simpan Perubahan"}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Batal</Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? "Menyimpan..." : "Simpan Perubahan"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -64,8 +64,8 @@ const generateChangeLog = (before: any, after: any): string[] => {
     if (JSON.stringify(before.opportunities) !== JSON.stringify(after.opportunities)) { changes.push("Peluang (Opportunity) diperbarui."); }
     if (JSON.stringify(before.relatedStandards) !== JSON.stringify(after.relatedStandards)) { changes.push("Standar Terkait diperbarui."); }
 
-    if(before.inherentRisk?.level !== after.inherentRisk.level) { changes.push(`Level Risiko Inheren berubah menjadi ${after.inherentRisk.level}.`); }
-    if(before.residualRisk?.level !== after.residualRisk.level) { changes.push(`Level Risiko Residual berubah menjadi ${after.residualRisk.level}.`); }
+    if (before.inherentRisk?.level !== after.inherentRisk.level) { changes.push(`Level Risiko Inheren berubah menjadi ${after.inherentRisk.level}.`); }
+    if (before.residualRisk?.level !== after.residualRisk.level) { changes.push(`Level Risiko Residual berubah menjadi ${after.residualRisk.level}.`); }
 
     return changes;
 }
@@ -150,8 +150,14 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 }
 
 // Fungsi DELETE tetap sama, tidak ada perubahan
-export async function DELETE(request: Request, { params }: { params: { id:string } }) {
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
     try {
+        // Authorization check - only SUPERUSER can delete
+        const { canDelete, unauthorizedDeleteResponse } = await import('@/lib/auth');
+        if (!(await canDelete())) {
+            return NextResponse.json(unauthorizedDeleteResponse(), { status: 403 });
+        }
+
         const { id } = params;
         const { db } = await connectToDatabase();
         if (!ObjectId.isValid(id)) return NextResponse.json({ message: 'ID tidak valid' }, { status: 400 });
@@ -163,11 +169,13 @@ export async function DELETE(request: Request, { params }: { params: { id:string
 
         const result = await db.collection(RISKS_COLLECTION).updateOne(
             { _id: new ObjectId(id) },
-            { $set: {
+            {
+                $set: {
                     deleted: true,
                     deletedAt: new Date(),
                     status: 'Archived'
-                }}
+                }
+            }
         );
 
         if (result.modifiedCount === 0) {

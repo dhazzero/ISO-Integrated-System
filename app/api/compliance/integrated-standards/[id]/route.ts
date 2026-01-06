@@ -19,6 +19,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
 export async function DELETE(_: Request, { params }: { params: { id: string } }) {
     try {
+        // Authorization check - only SUPERUSER can delete
+        const { canDelete, unauthorizedDeleteResponse } = await import('@/lib/auth');
+        if (!(await canDelete())) {
+            return NextResponse.json(unauthorizedDeleteResponse(), { status: 403 });
+        }
+
         const { db } = await connectToDatabase();
         const { id } = params;
         await db.collection('integrated-standard-table').deleteOne({ _id: new ObjectId(id) });

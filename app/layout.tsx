@@ -5,7 +5,7 @@ import "./globals.css"
 export const metadata = {
   title: "ISO Integrated System",
   description: "Sistem Manajemen Terintegrasi untuk Governance, Risk, dan Compliance",
-    generator: 'v0.dev'
+  generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -15,7 +15,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id" suppressHydrationWarning>
-      <body>
+      <body suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           {children}
         </ThemeProvider>

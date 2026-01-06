@@ -34,6 +34,26 @@ import { UploadDocumentModal } from "@/components/documents/upload-document-moda
 import { ViewDocumentModal } from "@/components/documents/view-document-modal"
 import { EditDocumentModal } from "@/components/documents/edit-document-modal"
 
+// Helper function to format date in readable format
+const formatDate = (dateString: string | null | undefined): string => {
+    if (!dateString) return "-";
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return dateString; // Return original if invalid
+
+        // Format: DD/MM/YYYY HH:mm
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const year = date.getFullYear();
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+
+        return `${day}/${month}/${year} ${hours}:${minutes}`;
+    } catch {
+        return dateString;
+    }
+};
+
 // Definisikan tipe untuk dokumen jika belum ada (opsional tapi direkomendasikan)
 interface DocumentItem {
     id: number | string;
@@ -53,6 +73,13 @@ interface DocumentItem {
     category?: string; // atau documentType
 }
 
+// User permissions interface
+interface UserPermissions {
+    canEdit: boolean;
+    canDelete: boolean;
+    canViewAudit: boolean;
+    canAccessSettings: boolean;
+}
 
 export default function DocumentsPage() {
     const [searchTerm, setSearchTerm] = useState("")
@@ -74,6 +101,9 @@ export default function DocumentsPage() {
 
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // User permissions state
+    const [permissions, setPermissions] = useState<UserPermissions | null>(null);
 
     const fetchDocuments = async () => {
         setIsLoading(true);
@@ -107,6 +137,19 @@ export default function DocumentsPage() {
 
     useEffect(() => {
         fetchDocuments();
+        // Fetch user permissions
+        const fetchPermissions = async () => {
+            try {
+                const res = await fetch('/api/auth/me');
+                if (res.ok) {
+                    const data = await res.json();
+                    setPermissions(data.permissions);
+                }
+            } catch (err) {
+                console.error('Failed to fetch permissions:', err);
+            }
+        };
+        fetchPermissions();
     }, []);
 
     const handleNewDocumentAdded = (newDocument: DocumentItem) => {
@@ -203,73 +246,79 @@ export default function DocumentsPage() {
         <div className="overflow-x-auto">
             <table className="w-full">
                 <thead>
-                <tr className="border-b">
-                    <th className="text-left py-3 px-4">Nama Dokumen</th>
-                    <th className="text-left py-3 px-4">Versi</th>
-                    <th className="text-left py-3 px-4">Status</th>
-                    {extraColumns.map((col) => (
-                        <th key={col} className="text-left py-3 px-4">
-                            {col === "approver" ? "Approver" :
-                                col === "owner" ? "Owner" :
-                                    col === "department" ? "Department" :
-                                        col === "scope" ? "Scope/Standar" :
-                                            col === "usage" ? "Penggunaan" :
-                                                col === "category" ? "Kategori" : col}
-                        </th>
-                    ))}
-                    <th className="text-left py-3 px-4">Terakhir Diperbarui</th>
-                    <th className="text-left py-3 px-4">Review Berikutnya</th>
-                    <th className="text-left py-3 px-4">Tindakan</th>
-                </tr>
+                    <tr className="border-b">
+                        <th className="text-left py-3 px-4">Nama Dokumen</th>
+                        <th className="text-left py-3 px-4">Versi</th>
+                        <th className="text-left py-3 px-4">Status</th>
+                        {extraColumns.map((col) => (
+                            <th key={col} className="text-left py-3 px-4">
+                                {col === "approver" ? "Approver" :
+                                    col === "owner" ? "Owner" :
+                                        col === "department" ? "Department" :
+                                            col === "scope" ? "Scope/Standar" :
+                                                col === "usage" ? "Penggunaan" :
+                                                    col === "category" ? "Kategori" : col}
+                            </th>
+                        ))}
+                        <th className="text-left py-3 px-4">Terakhir Diperbarui</th>
+                        <th className="text-left py-3 px-4">Review Berikutnya</th>
+                        <th className="text-left py-3 px-4">Tindakan</th>
+                    </tr>
                 </thead>
                 <tbody>
-                {documents.length === 0 && !isLoading ? (
-                    <tr>
-                        <td colSpan={extraColumns.length + 6} className="text-center py-10 text-muted-foreground">
-                            Tidak ada dokumen yang ditemukan.
-                        </td>
-                    </tr>
-                ) : (
-                    documents.map((doc) => (
-                        <tr key={doc.id} className="border-b hover:bg-muted/50">
-                            <td className="py-3 px-4">
-                                <div className="flex items-center">
-                                    {getStatusIcon(doc.status)}
-                                    <div className="ml-2">
-                                        <div className="font-medium">{doc.name}</div>
-                                        <div className="text-sm text-muted-foreground line-clamp-2" title={doc.description}>{doc.description}</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td className="py-3 px-4">{doc.version}</td>
-                            <td className="py-3 px-4">{getStatusBadge(doc.status)}</td>
-                            {extraColumns.map((colKey) => (
-                                <td key={colKey} className="py-3 px-4">
-                                    {/* @ts-ignore */}
-                                    {doc[colKey] || "-"}
-                                </td>
-                            ))}
-                            <td className="py-3 px-4">{doc.updatedAt}</td>
-                            <td className="py-3 px-4">{doc.nextReview}</td>
-                            <td className="py-3 px-4">
-                                <div className="flex space-x-1">
-                                    <Button variant="ghost" size="icon" title="Lihat" onClick={() => handleViewDocument(doc)}>
-                                        <Eye className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" title="Edit" onClick={() => handleEditDocument(doc)}>
-                                        <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" title="Download" onClick={() => handleDownloadDocument(doc)}>
-                                        <Download className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" title="Hapus" onClick={() => handleDeleteDocument(doc)}>
-                                        <Trash2 className="h-4 w-4 text-red-500" />
-                                    </Button>
-                                </div>
+                    {documents.length === 0 && !isLoading ? (
+                        <tr>
+                            <td colSpan={extraColumns.length + 6} className="text-center py-10 text-muted-foreground">
+                                Tidak ada dokumen yang ditemukan.
                             </td>
                         </tr>
-                    ))
-                )}
+                    ) : (
+                        documents.map((doc) => (
+                            <tr key={doc.id} className="border-b hover:bg-muted/50">
+                                <td className="py-3 px-4">
+                                    <div className="flex items-center">
+                                        {getStatusIcon(doc.status)}
+                                        <div className="ml-2">
+                                            <div className="font-medium">{doc.name}</div>
+                                            <div className="text-sm text-muted-foreground line-clamp-2" title={doc.description}>{doc.description}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td className="py-3 px-4">{doc.version}</td>
+                                <td className="py-3 px-4">{getStatusBadge(doc.status)}</td>
+                                {extraColumns.map((colKey) => (
+                                    <td key={colKey} className="py-3 px-4">
+                                        {/* @ts-ignore */}
+                                        {doc[colKey] || "-"}
+                                    </td>
+                                ))}
+                                <td className="py-3 px-4">{formatDate(doc.updatedAt)}</td>
+                                <td className="py-3 px-4">{formatDate(doc.nextReview)}</td>
+                                <td className="py-3 px-4">
+                                    <div className="flex space-x-1">
+                                        <Button variant="ghost" size="icon" title="Lihat" onClick={() => handleViewDocument(doc)}>
+                                            <Eye className="h-4 w-4" />
+                                        </Button>
+                                        {permissions?.canEdit && (
+                                            <Button variant="ghost" size="icon" title="Edit" onClick={() => handleEditDocument(doc)}>
+                                                <Edit className="h-4 w-4" />
+                                            </Button>
+                                        )}
+                                        {permissions?.canEdit && (
+                                            <Button variant="ghost" size="icon" title="Download" onClick={() => handleDownloadDocument(doc)}>
+                                                <Download className="h-4 w-4" />
+                                            </Button>
+                                        )}
+                                        {permissions?.canDelete && (
+                                            <Button variant="ghost" size="icon" title="Hapus" onClick={() => handleDeleteDocument(doc)}>
+                                                <Trash2 className="h-4 w-4 text-red-500" />
+                                            </Button>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))
+                    )}
                 </tbody>
             </table>
         </div>
@@ -299,28 +348,32 @@ export default function DocumentsPage() {
                 <h1 className="text-3xl font-bold">Manajemen Dokumentasi</h1>
                 <div className="flex space-x-2">
                     {/* === PERUBAHAN DI SINI === */}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button>
-                                <Plus className="mr-2 h-4 w-4" />
-                                Buat Dokumen
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                            {["Kebijakan", "Prosedur", "Instruksi Kerja", "Formulir", "Manual"].map(type => (
-                                <DropdownMenuItem key={type} onSelect={() => handleAddDocumentClick(type)}>
-                                    <FileText className="mr-2 h-4 w-4" />
-                                    <span>{type}</span>
-                                </DropdownMenuItem>
-                            ))}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                    {/* ======================= */}
+                    {permissions?.canEdit && (
+                        <>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button>
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Buat Dokumen
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    {["Kebijakan", "Prosedur", "Instruksi Kerja", "Formulir", "Manual"].map(type => (
+                                        <DropdownMenuItem key={type} onSelect={() => handleAddDocumentClick(type)}>
+                                            <FileText className="mr-2 h-4 w-4" />
+                                            <span>{type}</span>
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                            {/* ======================= */}
 
-                    <Button variant="outline" onClick={() => setIsUploadModalOpen(true)}>
-                        <Upload className="mr-2 h-4 w-4" />
-                        Unggah
-                    </Button>
+                            <Button variant="outline" onClick={() => setIsUploadModalOpen(true)}>
+                                <Upload className="mr-2 h-4 w-4" />
+                                Unggah
+                            </Button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -434,6 +487,7 @@ export default function DocumentsPage() {
                 onClose={() => setIsViewModalOpen(false)}
                 document={selectedDocument}
                 onEdit={handleEditDocument}
+                canEdit={permissions?.canEdit || false}
             />
             <EditDocumentModal
                 isOpen={isEditModalOpen}

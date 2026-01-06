@@ -55,6 +55,12 @@ export async function DELETE(
     { params }: { params: { id: string } }
 ) {
     try {
+        // Authorization check - only SUPERUSER can delete
+        const { canDelete, unauthorizedDeleteResponse } = await import('@/lib/auth');
+        if (!(await canDelete())) {
+            return NextResponse.json(unauthorizedDeleteResponse(), { status: 403 });
+        }
+
         const { db } = await connectToDatabase();
         await db.collection(COLLECTION).deleteOne({ _id: new ObjectId(params.id) });
         return NextResponse.json({ ok: true });

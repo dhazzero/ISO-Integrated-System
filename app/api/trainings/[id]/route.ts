@@ -50,6 +50,12 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
     try {
+        // Authorization check - only SUPERUSER can delete
+        const { canDelete, unauthorizedDeleteResponse } = await import('@/lib/auth');
+        if (!(await canDelete())) {
+            return NextResponse.json(unauthorizedDeleteResponse(), { status: 403 });
+        }
+
         const { db } = await connectToDatabase()
         if (!ObjectId.isValid(params.id)) {
             return NextResponse.json({ message: "Invalid ID format" }, { status: 400 })
