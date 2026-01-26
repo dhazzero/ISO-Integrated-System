@@ -1,19 +1,12 @@
 import { NextResponse } from 'next/server'
-import { connectToDatabase } from '@/lib/mongodb'
+import { getTenantDb } from '@/lib/db-helper'
 
 const COLLECTION = 'compliance'
 
-// GET Annex A controls from 'compliance' collection
 export async function GET() {
     try {
-        const { db } = await connectToDatabase()
-        const controls = await db
-            .collection(COLLECTION)
-            .find({ category: 'Annex A' })
-            .sort({ control_id: 1 })
-            .toArray()
-
-        // Convert MongoDB ObjectIds to strings so the client can use them as keys
+        const { db } = await getTenantDb()
+        const controls = await db.collection(COLLECTION).find({ category: 'Annex A' }).sort({ control_id: 1 }).toArray()
         const formatted = controls.map((c) => ({ ...c, _id: c._id.toString() }))
         return NextResponse.json(formatted, { status: 200 })
     } catch (error) {
@@ -22,11 +15,10 @@ export async function GET() {
     }
 }
 
-// POST a new Annex A control into the same collection
 export async function POST(request: Request) {
     try {
         const data = await request.json()
-        const { db } = await connectToDatabase()
+        const { db } = await getTenantDb()
         const newControl = {
             control_id: data.control_id,
             title: data.title || '',

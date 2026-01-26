@@ -34,7 +34,12 @@ export function UserButton() {
                 const response = await fetch('/api/auth/me');
                 if (response.ok) {
                     const data = await response.json();
-                    setUser(data);
+                    // Support both old format (data directly) and new format (data.user)
+                    if (data.user) {
+                        setUser(data.user);
+                    } else {
+                        setUser(data);
+                    }
                 }
             } catch (error) {
                 console.error('Failed to fetch user:', error);

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
@@ -23,6 +23,13 @@ interface StandardSummary {
     docPercentage: number
 }
 
+interface ComplianceFeatures {
+    checklist: boolean
+    integrated: boolean
+    annexA: boolean
+    ojk: boolean
+}
+
 export default function CompliancePage() {
     const [standards, setStandards] = useState<StandardSummary[]>([])
     const [overallCompliance, setOverallCompliance] = useState<number>(0)
@@ -31,25 +38,43 @@ export default function CompliancePage() {
     const [totalCompliant, setTotalCompliant] = useState<number>(0)
     const [totalNonCompliant, setTotalNonCompliant] = useState<number>(0)
     const [totalPartial, setTotalPartial] = useState<number>(0)
+    const [complianceFeatures, setComplianceFeatures] = useState<ComplianceFeatures>({
+        checklist: true,
+        integrated: true,
+        annexA: true,
+        ojk: true
+    })
     const { toast } = useToast()
 
-    const fetchStandards = async () => {
+    useEffect(() => {
+        fetchData()
+    }, [])
+
+    const fetchData = async () => {
         try {
-            const [stdRes, ctrlRes, annexRes, ojkRes] = await Promise.all([
+            const [stdRes, ctrlRes, annexRes, ojkRes, settingsRes] = await Promise.all([
                 fetch('/api/settings/standards'),
                 fetch('/api/compliance/controls'),
                 fetch('/api/compliance/annex-a'),
                 fetch('/api/compliance/ojk-reports'),
+                fetch('/api/settings/system-settings'),
             ])
+
             if (!stdRes.ok || !ctrlRes.ok || !annexRes.ok || !ojkRes.ok) {
                 throw new Error('Gagal mengambil data kepatuhan')
             }
-            const [stdData, ctrlData, annexData, ojkData] = await Promise.all([
+
+            const [stdData, ctrlData, annexData, ojkData, settingsData] = await Promise.all([
                 stdRes.json(),
                 ctrlRes.json(),
                 annexRes.json(),
                 ojkRes.json(),
-            ])
+                settingsRes.ok ? settingsRes.json() : {}
+            ]) as any[]
+
+            if (settingsData.complianceFeatures) {
+                setComplianceFeatures(settingsData.complianceFeatures)
+            }
 
             const implementedStatuses = ['Diterapkan', 'Diterapkan / Implemented', 'Implemented', 'Dilaporkan', 'Sudah Dilaporkan']
             const partialStatuses = ['Partial', 'Sebagian', 'Partially Implemented', 'Under Review']
@@ -76,7 +101,6 @@ export default function CompliancePage() {
                 }
             })
 
-            // Aggregate metrics for the top header
             const normalizedOjk = ojkData.map((o: any) => ({ ...o, status: o.Status }));
             const allItems = [...ctrlData, ...annexData, ...normalizedOjk]
             const totalClausesAgg = allItems.length
@@ -101,15 +125,9 @@ export default function CompliancePage() {
         }
     }
 
-    useEffect(() => {
-        fetchStandards()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
-
-
     return (
         <div className="container mx-auto px-4 py-6">
-            <div className="flex justify-between items-center mb-6">
+            <div className="mb-6">
                 <h1 className="text-3xl font-bold">Pemetaan Kepatuhan</h1>
             </div>
 
@@ -177,26 +195,39 @@ export default function CompliancePage() {
             </div>
 
 
-            <Tabs defaultValue="checklist" className="w-full">
+            <Tabs defaultValue={
+                complianceFeatures.checklist ? "checklist" :
+                    complianceFeatures.integrated ? "integrated" :
+                        complianceFeatures.annexA ? "annex-a" :
+                            complianceFeatures.ojk ? "ojk-report" : ""
+            } className="w-full">
                 <TabsList className="mb-4 flex flex-wrap gap-2">
-                    <TabsTrigger value="checklist">Compliance Checklist</TabsTrigger>
-                    <TabsTrigger value="integrated">Integrated Standards</TabsTrigger>
-                    <TabsTrigger value="annex-a">ISO 27001 Annex A</TabsTrigger>
-                    <TabsTrigger value="ojk-report">Informasi OJK</TabsTrigger>
+                    {complianceFeatures.checklist && <TabsTrigger value="checklist">Compliance Checklist</TabsTrigger>}
+                    {complianceFeatures.integrated && <TabsTrigger value="integrated">Integrated Standards</TabsTrigger>}
+                    {complianceFeatures.annexA && <TabsTrigger value="annex-a">ISO 27001 Annex A</TabsTrigger>}
+                    {complianceFeatures.ojk && <TabsTrigger value="ojk-report">Informasi OJK</TabsTrigger>}
                 </TabsList>
 
-                <TabsContent value="checklist">
-                    <ComplianceChecklist />
-                </TabsContent>
-                <TabsContent value="integrated">
-                    <IntegratedStandardTable />
-                </TabsContent>
-                <TabsContent value="annex-a">
-                    <AnnexAControls />
-                </TabsContent>
-                <TabsContent value="ojk-report">
-                    <OjkComplianceReport />
-                </TabsContent>
+                {complianceFeatures.checklist && (
+                    <TabsContent value="checklist">
+                        <ComplianceChecklist />
+                    </TabsContent>
+                )}
+                {complianceFeatures.integrated && (
+                    <TabsContent value="integrated">
+                        <IntegratedStandardTable />
+                    </TabsContent>
+                )}
+                {complianceFeatures.annexA && (
+                    <TabsContent value="annex-a">
+                        <AnnexAControls />
+                    </TabsContent>
+                )}
+                {complianceFeatures.ojk && (
+                    <TabsContent value="ojk-report">
+                        <OjkComplianceReport />
+                    </TabsContent>
+                )}
             </Tabs>
         </div>
     )

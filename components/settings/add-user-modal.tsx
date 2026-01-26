@@ -17,13 +17,20 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { Department, User as UserType, UserRole } from "@/lib/types"
+import { Department, User as UserType } from "@/lib/types"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/components/ui/use-toast"
 import { logActivity } from "@/lib/logger"
+import { useEffect, useState } from "react"
+
+interface RoleInfo {
+    id: string;
+    name: string;
+    description: string;
+}
 
 interface AddUserModalProps {
     isOpen: boolean;
@@ -45,13 +52,15 @@ const formSchema = z.object({
     userId: z.string().min(3, "User ID minimal 3 karakter"),
     email: z.string().email("Format email tidak valid"),
     password: passwordValidation,
-    role: z.nativeEnum(UserRole, { errorMap: () => ({ message: "Role harus dipilih" }) }),
+    role: z.string().min(1, "Role harus dipilih"),
     departmentId: z.string().optional().nullable(),
     supervisorId: z.string().optional().nullable(),
 })
 
 export function AddUserModal({ isOpen, onOpenChange, departments, users, onUserAdded }: AddUserModalProps) {
     const { toast } = useToast();
+    const [availableRoles, setAvailableRoles] = useState<RoleInfo[]>([]);
+
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -59,14 +68,35 @@ export function AddUserModal({ isOpen, onOpenChange, departments, users, onUserA
             userId: "",
             email: "",
             password: "",
-            role: UserRole.STAFF, // Menetapkan nilai default untuk role
+            role: "",
             departmentId: "null",
             supervisorId: "null",
         },
     })
 
+    // Fetch roles from API
+    useEffect(() => {
+        const fetchRoles = async () => {
+            try {
+                const res = await fetch('/api/roles');
+                if (res.ok) {
+                    const data = await res.json();
+                    setAvailableRoles(data.roles || []);
+                    // Set default role to first available if not set
+                    if (data.roles?.length > 0 && !form.getValues('role')) {
+                        form.setValue('role', data.roles[data.roles.length - 1].id); // Default to last (usually staff)
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to fetch roles:', error);
+            }
+        };
+        if (isOpen) {
+            fetchRoles();
+        }
+    }, [isOpen]);
+
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
-        // Menangani nilai 'null' dari select-box
         const payload = {
             ...values,
             departmentId: values.departmentId === "null" ? null : values.departmentId,
@@ -82,7 +112,6 @@ export function AddUserModal({ isOpen, onOpenChange, departments, users, onUserA
 
             if (!response.ok) {
                 const errorData = await response.json();
-                // Lemparkan error dengan status untuk ditangkap di blok catch
                 const error = new Error(errorData.message || "Gagal membuat pengguna");
                 (error as any).status = response.status;
                 throw error;
@@ -95,15 +124,17 @@ export function AddUserModal({ isOpen, onOpenChange, departments, users, onUserA
             form.reset();
         } catch (error: any) {
             if (error.status === 409) {
-                // Jika error adalah 409 (Conflict), set error pada form
                 form.setError("userId", { type: "manual", message: "User ID atau email ini sudah digunakan." });
                 form.setError("email", { type: "manual", message: "User ID atau email ini sudah digunakan." });
             } else {
-                // Untuk error lainnya, tampilkan toast
                 toast({ variant: "destructive", title: "Error", description: error.message });
             }
         }
     }
+
+    // Get supervisor-eligible users (managers, admins)
+    const supervisorRoles = ['manager', 'administrator', 'superuser', 'admin'];
+    const eligibleSupervisors = users.filter(u => u.role && supervisorRoles.includes(u.role.toLowerCase()));
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -169,11 +200,13 @@ export function AddUserModal({ isOpen, onOpenChange, departments, users, onUserA
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Role</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <Select onValueChange={field.onChange} value={field.value}>
                                             <FormControl><SelectTrigger><SelectValue placeholder="Pilih role" /></SelectTrigger></FormControl>
                                             <SelectContent>
-                                                {Object.values(UserRole).map(role => (
-                                                    <SelectItem key={role} value={role}>{role.charAt(0).toUpperCase() + role.slice(1)}</SelectItem>
+                                                {availableRoles.map(role => (
+                                                    <SelectItem key={role.id} value={role.id}>
+                                                        {role.name}
+                                                    </SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
@@ -211,7 +244,7 @@ export function AddUserModal({ isOpen, onOpenChange, departments, users, onUserA
                                         <FormControl><SelectTrigger><SelectValue placeholder="Pilih atasan" /></SelectTrigger></FormControl>
                                         <SelectContent>
                                             <SelectItem value="null">Tidak ada atasan</SelectItem>
-                                            {users.filter(u => u.role === UserRole.MANAGER || u.role === UserRole.ADMINISTRATOR).map(user => (
+                                            {eligibleSupervisors.map(user => (
                                                 <SelectItem key={user._id.toString()} value={user._id.toString()}>{user.name}</SelectItem>
                                             ))}
                                         </SelectContent>

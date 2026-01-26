@@ -1,8 +1,7 @@
 // lib/server-logger.ts
 // Server-side activity logging function for API routes
 
-import { connectToDatabase } from '@/lib/mongodb';
-import { getCurrentUser } from '@/lib/auth';
+import { getTenantDb } from '@/lib/db-helper';
 
 const LOGS_COLLECTION = 'security_logs';
 
@@ -18,6 +17,7 @@ interface LogDetails {
 /**
  * Server-side activity logger for API routes
  * This is used in server components and API routes where fetch() to internal API is not ideal
+ * Now uses tenant database for multi-tenant support
  */
 export async function logActivityServer(
     action: string,
@@ -27,17 +27,16 @@ export async function logActivityServer(
     ipAddress?: string
 ) {
     try {
-        const { db } = await connectToDatabase();
-        const currentUser = await getCurrentUser();
+        const { db, user } = await getTenantDb();
 
         const newLog = {
             action,
             module,
             description,
             details: details || null,
-            userId: currentUser?.userId || null,
-            userName: currentUser?.userName || 'System',
-            userRole: currentUser?.userRole || null,
+            userId: user?.userId || null,
+            userName: user?.userName || 'System',
+            userRole: user?.userRole || null,
             timestamp: new Date(),
             ip: ipAddress || '127.0.0.1',
         };

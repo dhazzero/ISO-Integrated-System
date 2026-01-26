@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getTenantDb } from '@/lib/db-helper';
 import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
 import type { WithId, Document } from 'mongodb';
@@ -8,7 +8,7 @@ const COLLECTION = 'OJK_Compliance_Report';
 
 export async function GET(req: Request) {
     try {
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         const { searchParams } = new URL(req.url);
         const order = searchParams.get('order') === 'asc' ? 1 : -1;
         const docs: WithId<Document>[] = await db
@@ -45,9 +45,9 @@ export async function POST(req: Request) {
         }
 
         let fileUrl: string | undefined;
+        // Note: For now saving to public/uploads/ojk-reports. 
+        // In a true multi-tenant setup, we might want to segregate uploads by tenant in the future.
         if (file) {
-            if (Status) doc.Status = Status;
-            if (Kepatuhan) doc.Kepatuhan = Kepatuhan;
             const bytes = await file.arrayBuffer();
             const buffer = Buffer.from(bytes);
             const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'ojk-reports');
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
             fileUrl = `/uploads/ojk-reports/${file.name}`;
         }
 
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         const doc: Record<string, unknown> = {
             Bulan,
             Jenis_Laporan,
@@ -65,6 +65,8 @@ export async function POST(req: Request) {
             DueDate,
             Pengiriman,
             Regulasi_acuan,
+            Status: Status || undefined,
+            Kepatuhan: Kepatuhan || undefined,
             createdAt: new Date(),
             updatedAt: new Date(),
         };

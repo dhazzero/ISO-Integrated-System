@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { connectToDatabase } from "@/lib/mongodb"
+import { getTenantDb } from "@/lib/db-helper"
 import { NextRequest } from "next/server"
 import { ObjectId } from "mongodb"
 
@@ -7,7 +7,7 @@ const TRAININGS_COLLECTION = 'trainings'
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
     try {
-        const { db } = await connectToDatabase()
+        const { db } = await getTenantDb()
         if (!ObjectId.isValid(params.id)) {
             return NextResponse.json({ message: "Invalid ID format" }, { status: 400 })
         }
@@ -23,13 +23,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
     try {
-        const { db } = await connectToDatabase()
+        const { db } = await getTenantDb()
         if (!ObjectId.isValid(params.id)) {
             return NextResponse.json({ message: "Invalid ID format" }, { status: 400 })
         }
         const body = await request.json()
-
-        // Ensure not to update the _id
         delete body._id
 
         const result = await db.collection(TRAININGS_COLLECTION).updateOne(
@@ -50,13 +48,12 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
     try {
-        // Authorization check - only SUPERUSER can delete
         const { canDelete, unauthorizedDeleteResponse } = await import('@/lib/auth');
         if (!(await canDelete())) {
             return NextResponse.json(unauthorizedDeleteResponse(), { status: 403 });
         }
 
-        const { db } = await connectToDatabase()
+        const { db } = await getTenantDb()
         if (!ObjectId.isValid(params.id)) {
             return NextResponse.json({ message: "Invalid ID format" }, { status: 400 })
         }

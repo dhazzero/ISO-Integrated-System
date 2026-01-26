@@ -12,14 +12,20 @@ export interface CurrentUser {
     userRole: string;
     departmentId?: string;
     departmentName?: string;
+    // Multi-tenant info
+    companyCode: string;
+    companyId: string;
+    companyName: string;
+    databaseName: string;
+    isSuperAdmin: boolean;
 }
 
 // Role hierarchy for permission checks (lowercase to match database values)
 // Include all role variations that may exist in database
-const EDIT_ROLES = ['superuser', 'admin', 'administrator', 'manager', 'hse_manager'];
-const VIEW_AUDIT_ROLES = ['superuser', 'admin', 'administrator', 'manager', 'hse_manager'];
-const SETTINGS_ROLES = ['superuser', 'admin', 'administrator'];
-const DELETE_ROLES = ['superuser'];
+const EDIT_ROLES = ['superuser', 'admin', 'administrator', 'manager', 'hse_manager', 'superadmin'];
+const VIEW_AUDIT_ROLES = ['superuser', 'admin', 'administrator', 'manager', 'hse_manager', 'superadmin'];
+const SETTINGS_ROLES = ['superuser', 'admin', 'administrator', 'superadmin'];
+const DELETE_ROLES = ['superuser', 'superadmin'];
 
 // Get current user from session
 export async function getCurrentUser(): Promise<CurrentUser | null> {
@@ -37,12 +43,19 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
             userRole: payload.role as string || 'USER',
             departmentId: payload.departmentId as string | undefined,
             departmentName: payload.departmentName as string | undefined,
+            // Multi-tenant info
+            companyCode: payload.companyCode as string || 'UNKNOWN',
+            companyId: payload.companyId as string || '',
+            companyName: payload.companyName as string || '',
+            databaseName: payload.databaseName as string || '',
+            isSuperAdmin: payload.isSuperAdmin as boolean || false,
         };
     } catch (error) {
         console.error('Failed to get current user:', error);
         return null;
     }
 }
+
 
 // Check if user can delete (SUPERUSER only)
 export async function canDelete(): Promise<boolean> {
@@ -51,27 +64,50 @@ export async function canDelete(): Promise<boolean> {
     return DELETE_ROLES.includes(user.userRole);
 }
 
-// Check if user can edit (SUPERUSER, ADMIN, MANAGER)
-// For MANAGER, can optionally check department match
+// Check if user can edit (uses company-specific permission matrix)
 export async function canEdit(documentDepartmentId?: string): Promise<boolean> {
     const user = await getCurrentUser();
     if (!user) return false;
 
-    // SUPERUSER and ADMIN can edit anything
-    if (user.userRole === 'superuser' || user.userRole === 'admin') {
+    // Super admins can always edit
+    if (user.isSuperAdmin) return true;
+
+    try {
+        // Fetch company-specific permissions
+        const { connectToMasterDatabase } = await import('@/lib/mongodb-tenant');
+        const { db } = await connectToMasterDatabase();
+        const companyPerms = await db.collection('company_permissions').findOne({
+            companyCode: user.companyCode
+        });
+
+        // Default edit roles if no custom config
+        const defaultEditRoles = ['superuser', 'admin', 'administrator', 'manager', 'hse_manager'];
+        const editRoles = companyPerms?.permissions?.canEdit || defaultEditRoles;
+        const role = user.userRole.toLowerCase();
+
+        // Check if user's role has edit permission
+        if (!editRoles.includes(role)) {
+            return false;
+        }
+
+        // MANAGER can only edit own department
+        if (role === 'manager' && documentDepartmentId) {
+            return user.departmentId === documentDepartmentId;
+        }
+
         return true;
+    } catch (error) {
+        console.error('Error checking edit permission:', error);
+        // Fallback to hardcoded check
+        if (user.userRole === 'superuser' || user.userRole === 'admin') {
+            return true;
+        }
+        if (user.userRole === 'manager') {
+            if (!documentDepartmentId) return true;
+            return user.departmentId === documentDepartmentId;
+        }
+        return false;
     }
-
-    // MANAGER can only edit own department
-    if (user.userRole === 'manager') {
-        // If no department specified, allow (general edit permission)
-        if (!documentDepartmentId) return true;
-        // Check department match
-        return user.departmentId === documentDepartmentId;
-    }
-
-    // STAFF and USER cannot edit
-    return false;
 }
 
 // Check if user can view Audit tab (STAFF cannot)

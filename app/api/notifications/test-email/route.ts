@@ -1,12 +1,12 @@
 // app/api/notifications/test-email/route.ts
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getTenantDb } from '@/lib/db-helper';
 
 // GET - Retrieve SMTP settings
 export async function GET() {
     try {
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         const settings = await db.collection('notification_settings').findOne({ settingsKey: 'smtp' });
 
         if (!settings) {
@@ -130,7 +130,7 @@ export async function PUT(request: Request) {
         const body = await request.json();
         const { smtpHost, smtpPort, smtpUser, smtpPass, smtpSecure, fromEmail } = body;
 
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
 
         await db.collection('notification_settings').updateOne(
             { settingsKey: 'smtp' },

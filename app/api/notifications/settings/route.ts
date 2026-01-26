@@ -1,6 +1,6 @@
 // app/api/notifications/settings/route.ts
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getTenantDb } from '@/lib/db-helper';
 
 // Default notification templates with PIC
 const defaultNotificationSettings = {
@@ -61,7 +61,7 @@ const defaultNotificationSettings = {
 // GET - Retrieve notification settings
 export async function GET() {
     try {
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         const settings = await db.collection('notification_settings').findOne({ settingsKey: 'notifications' });
 
         if (!settings) {
@@ -84,7 +84,7 @@ export async function PUT(request: Request) {
         const body = await request.json();
         const { templates, globalSettings } = body;
 
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
 
         await db.collection('notification_settings').updateOne(
             { settingsKey: 'notifications' },

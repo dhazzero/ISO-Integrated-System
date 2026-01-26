@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
-import { User, UserRole } from '@/lib/types';
+import { getTenantDb } from '@/lib/db-helper';
+import { User } from '@/lib/types';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { ObjectId } from 'mongodb';
 
 export async function GET() {
     try {
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         const users = await db.collection<User>('users').find({}, {
             projection: { password: 0 }
         }).toArray();
@@ -31,14 +31,14 @@ const userSchema = z.object({
     userId: z.string().min(1, { message: "User ID diperlukan" }),
     email: z.string().email({ message: "Email tidak valid" }),
     password: passwordValidation,
-    role: z.nativeEnum(UserRole),
+    role: z.string().min(1, { message: "Role diperlukan" }), // Changed from nativeEnum to string for dynamic roles
     departmentId: z.string().optional().nullable(),
     supervisorId: z.string().optional().nullable(),
 });
 
 export async function POST(request: Request) {
     try {
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         const body = await request.json();
 
         const validation = userSchema.safeParse(body);
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const newUser: Omit<User, '_id'> = {
+        const newUser = {
             name,
             userId,
             email,
@@ -66,6 +66,8 @@ export async function POST(request: Request) {
             supervisorId: supervisorId ? new ObjectId(supervisorId) : null,
             status: 'active', // Default status
             lastLogin: null,
+            failedLoginAttempts: 0,
+            lockedAt: null,
             createdAt: new Date(),
             updatedAt: new Date(),
         };

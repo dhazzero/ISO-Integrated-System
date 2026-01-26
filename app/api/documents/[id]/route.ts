@@ -1,30 +1,17 @@
 // app/api/documents/[id]/route.ts
 
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { connectToTenantDatabase } from '@/lib/mongodb-tenant';
 import { ObjectId, GridFSBucket } from 'mongodb';
 import { logActivityServer, LogAction, LogModule } from '@/lib/server-logger';
 
 const COLLECTION_NAME = 'documents';
 
-// === FUNGSI PUT YANG DIPERBAIKI (TANPA FORMIDABLE) ===
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
     const { id } = params;
-    const { db } = await connectToDatabase();
 
-    if (!id || !ObjectId.isValid(id)) {
-      return NextResponse.json({ message: 'Invalid document id' }, { status: 400 });
-    }
-    const _id = new ObjectId(id);
-
-    // 1. Temukan dokumen yang ada untuk mendapatkan fileId lama dan departemen
-    const existingDoc = await db.collection(COLLECTION_NAME).findOne({ _id });
-    if (!existingDoc) {
-      return NextResponse.json({ message: 'Document not found' }, { status: 404 });
-    }
-
-    // Authorization check - only SUPERUSER, ADMIN, MANAGER (own dept) can edit
+    // Authorization check - get current user first
     const { canEdit, unauthorizedEditResponse, departmentMismatchResponse, getCurrentUser } = await import('@/lib/auth');
     const currentUser = await getCurrentUser();
 
@@ -32,7 +19,21 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check edit permission with department validation for MANAGER
+    // Connect to tenant database using user's company code
+    const { db } = await connectToTenantDatabase(currentUser.companyCode);
+
+    if (!id || !ObjectId.isValid(id)) {
+      return NextResponse.json({ message: 'Invalid document id' }, { status: 400 });
+    }
+    const _id = new ObjectId(id);
+
+    // 1. Temukan dokumen yang ada
+    const existingDoc = await db.collection(COLLECTION_NAME).findOne({ _id });
+    if (!existingDoc) {
+      return NextResponse.json({ message: 'Document not found' }, { status: 404 });
+    }
+
+    // Check edit permission
     const docDepartmentId = existingDoc.department || existingDoc.departmentId;
     if (!(await canEdit(docDepartmentId))) {
       // MANAGER trying to edit different department
@@ -42,30 +43,74 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       return NextResponse.json(unauthorizedEditResponse(), { status: 403 });
     }
 
-    // Membaca body request sebagai JSON, sesuai alur asli Anda
-    const updateData = await request.json();
+    // 2. Parse FormData (karena frontend mengirim FormData untuk support file upload)
+    const formData = await request.formData();
+    const file = formData.get('file') as File | null;
 
-    // 2. Cek jika frontend mengirim fileId baru (artinya ada file baru yang diupload)
-    if (updateData.fileId && updateData.fileId !== existingDoc.fileId?.toString()) {
-      // Jika ada fileId lama, hapus dari GridFS
+    // Extract textual fields
+    const updateData: any = {};
+    const fields = ['name', 'description', 'version', 'status', 'classification', 'owner', 'department', 'scope', 'approver', 'reviewDate', 'effectiveDate', 'documentType', 'category', 'nextReview'];
+
+    fields.forEach(field => {
+      const value = formData.get(field);
+      if (value !== null && value !== undefined) {
+        updateData[field] = value.toString();
+      }
+    });
+
+    // Sync category with documentType if documentType is provided
+    if (updateData.documentType && !updateData.category) {
+      updateData.category = updateData.documentType;
+    }
+
+    // Sync nextReview with reviewDate if reviewDate is provided
+    if (updateData.reviewDate && !updateData.nextReview) {
+      updateData.nextReview = updateData.reviewDate;
+    }
+
+    // 3. Handle File Upload jika ada file baru
+    if (file) {
+      const bucket = new GridFSBucket(db, { bucketName: 'uploads' });
+
+      // Upload file baru
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+
+      const uploadStream = bucket.openUploadStream(file.name, {
+        contentType: file.type,
+        metadata: {
+          originalName: file.name,
+          uploadedBy: currentUser.userId,
+          department: updateData.department || existingDoc.department
+        }
+      });
+
+      const newFileId = await new Promise<ObjectId>((resolve, reject) => {
+        uploadStream.end(buffer, (error: any) => {
+          if (error) reject(error);
+          else resolve(uploadStream.id);
+        });
+      });
+
+      // Update metadata file di dokumen
+      updateData.fileId = newFileId;
+      updateData.fileName = file.name;
+      updateData.fileType = file.type;
+      updateData.fileSize = file.size; // in bytes
+
+      // Hapus file lama jika ada
       if (existingDoc.fileId) {
         try {
-          const bucket = new GridFSBucket(db, { bucketName: 'uploads' });
-          await bucket.delete(new ObjectId(String(existingDoc.fileId)));
+          await bucket.delete(new ObjectId(existingDoc.fileId.toString()));
         } catch (err) {
-          // Log error tapi jangan hentikan proses, update metadata tetap lebih penting
-          console.error('Failed to delete old file, but proceeding with update:', err);
+          console.warn('Failed to delete old file:', err);
         }
       }
     }
 
-    // 3. Setel waktu pembaruan
+    // 4. Setel waktu pembaruan
     updateData.updatedAt = new Date();
     updateData.updatedBy = currentUser.userName;
-
-    // 4. Hapus field _id dan id dari objek updateData sebelum dikirim ke database.
-    delete updateData._id;
-    delete updateData.id;
 
     // 5. Lakukan update pada dokumen
     const result = await db.collection(COLLECTION_NAME).findOneAndUpdate(
@@ -74,12 +119,11 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       { returnDocument: 'after' }
     );
 
-    // Cek jika operasi update berhasil
     if (!result) {
       throw new Error('Document not found during the update operation.');
     }
 
-    // 6. Log activity ke security_logs
+    // 6. Log activity
     const docName = result.name || existingDoc.name || id;
     await logActivityServer(
       LogAction.UPDATE,
@@ -93,7 +137,6 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       request.headers.get('x-forwarded-for') || undefined
     );
 
-    // 7. Kembalikan dokumen yang telah diperbarui
     return NextResponse.json(result);
 
   } catch (error) {
@@ -118,7 +161,10 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     }
 
     const { id } = params;
-    const { db } = await connectToDatabase();
+
+    // Connect to tenant database using user's company code
+    const { db } = await connectToTenantDatabase(currentUser.companyCode);
+
     if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json({ message: 'Invalid document id' }, { status: 400 });
     }

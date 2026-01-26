@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getTenantDb } from '@/lib/db-helper';
 
 const BACKUP_COLLECTION = 'database_backups';
 
 // GET - Retrieve backup history
 export async function GET() {
     try {
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         const backups = await db.collection(BACKUP_COLLECTION)
             .find({})
             .sort({ date: -1 })
@@ -26,7 +26,7 @@ export async function GET() {
 // POST - Create backup and return as download
 export async function POST() {
     try {
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
 
         const collectionsToBackup = [
             'users',
@@ -81,7 +81,7 @@ export async function POST() {
 
         // Store failed backup record
         try {
-            const { db } = await connectToDatabase();
+            const { db } = await getTenantDb();
             await db.collection(BACKUP_COLLECTION).insertOne({
                 name: `backup-failed-${new Date().toISOString()}`,
                 size: '0 KB',

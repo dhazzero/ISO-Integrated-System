@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getTenantDb } from '@/lib/db-helper';
 import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
 
@@ -8,7 +8,7 @@ const COLLECTION = 'OJK_Compliance_Report';
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
     try {
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         const doc = await db.collection(COLLECTION).findOne({ _id: new ObjectId(params.id) });
         if (!doc) return NextResponse.json({ message: 'Not found' }, { status: 404 });
         return NextResponse.json({ ...doc, _id: doc._id.toString() });
@@ -54,7 +54,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
             update.fileUrl = `/uploads/ojk-reports/${file.name}`;
         }
 
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         await db.collection(COLLECTION).updateOne({ _id: new ObjectId(params.id) }, { $set: update });
         const updated = await db.collection(COLLECTION).findOne({ _id: new ObjectId(params.id) });
         if (!updated) return NextResponse.json({ message: 'Not found' }, { status: 404 });

@@ -63,3 +63,46 @@ export interface SecurityLog {
     ip: string;
     details?: Record<string, unknown> | null;
 }
+
+// ============ Multi-Tenant Types ============
+
+export interface Company {
+    _id: ObjectId;
+    code: string;           // Unique code for login, e.g., "PBB", "ACME"
+    name: string;           // Full company name
+    logo?: string;          // URL to company logo
+    address?: string;
+    phone?: string;
+    email?: string;
+    website?: string;
+    taxId?: string;         // NPWP
+    businessLicense?: string; // NIB
+    status: 'active' | 'inactive' | 'suspended';
+    databaseName: string;   // Database name for this company, e.g., "iso_pbb", "iso_acme"
+    subscription?: {
+        plan: 'basic' | 'professional' | 'enterprise';
+        expiresAt: Date;
+    };
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+// Super Admin - stored in master database
+export interface SuperAdmin {
+    _id: ObjectId;
+    userId: string;
+    name: string;
+    email: string;
+    password: string;       // hashed
+    status: 'active' | 'inactive';
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+// Tenant context for current request
+export interface TenantContext {
+    companyCode: string;
+    companyId: string;
+    companyName: string;
+    databaseName: string;
+}

@@ -1,6 +1,6 @@
 // app/api/settings/departments/[id]/route.ts
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getTenantDb } from '@/lib/db-helper';
 import { ObjectId } from 'mongodb';
 
 const DEPARTMENTS_COLLECTION = 'departments';
@@ -9,7 +9,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     try {
         const { id } = params;
         const data = await request.json();
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         if (!ObjectId.isValid(id)) return NextResponse.json({ message: 'ID tidak valid' }, { status: 400 });
         if (!data.name || !data.head) return NextResponse.json({ message: 'Nama dan kepala departemen wajib diisi' }, { status: 400 });
 
@@ -29,7 +29,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
     try {
         const { id } = params;
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         if (!ObjectId.isValid(id)) return NextResponse.json({ message: 'ID tidak valid' }, { status: 400 });
 
         const result = await db.collection(DEPARTMENTS_COLLECTION).deleteOne({ _id: new ObjectId(id) });

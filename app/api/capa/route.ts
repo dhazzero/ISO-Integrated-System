@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { connectToDatabase } from '@/lib/mongodb'
+import { getTenantDb } from '@/lib/db-helper'
 import { ObjectId } from 'mongodb'
 
 const CAPA_COLLECTION = 'capas'
@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(_req: NextRequest) {
     try {
-        const { db } = await connectToDatabase()
+        const { db } = await getTenantDb()
         const capas = await db.collection(CAPA_COLLECTION).find({}).sort({ createdAt: -1 }).toArray()
         return NextResponse.json(capas, { status: 200 })
     } catch (error) {
@@ -19,7 +19,7 @@ export async function GET(_req: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const data = await request.json()
-        const { db } = await connectToDatabase()
+        const { db } = await getTenantDb()
 
         if (!data.issue || !data.department || !data.responsible) {
             return NextResponse.json({ message: 'Data CAPA tidak lengkap' }, { status: 400 })

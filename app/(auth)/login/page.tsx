@@ -4,24 +4,72 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, Building2 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+
+interface CompanyOption {
+    code: string;
+    name: string;
+}
 
 export default function LoginPage() {
+    const [companyCode, setCompanyCode] = useState("")
+    const [companies, setCompanies] = useState<CompanyOption[]>([])
     const [userId, setUserId] = useState("")
     const [password, setPassword] = useState("")
     const [showPassword, setShowPassword] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+    const [isLoadingCompanies, setIsLoadingCompanies] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const router = useRouter()
     const { toast } = useToast()
+
+    // Load available companies on mount
+    useEffect(() => {
+        async function loadCompanies() {
+            try {
+                const res = await fetch('/api/companies');
+                if (res.ok) {
+                    const data = await res.json();
+                    setCompanies(data.companies || []);
+                    // Auto-select if only one company
+                    if (data.companies?.length === 1) {
+                        setCompanyCode(data.companies[0].code);
+                    }
+                    // Check localStorage for last used company
+                    const lastCompany = localStorage.getItem('lastCompanyCode');
+                    if (lastCompany && data.companies?.find((c: CompanyOption) => c.code === lastCompany)) {
+                        setCompanyCode(lastCompany);
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to load companies:', err);
+            } finally {
+                setIsLoadingCompanies(false);
+            }
+        }
+        loadCompanies();
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
         setIsLoading(true)
         setError(null)
+
+        if (!companyCode) {
+            setError('Pilih perusahaan terlebih dahulu')
+            setIsLoading(false)
+            return
+        }
 
         try {
             const res = await fetch('/api/auth/login', {
@@ -29,19 +77,30 @@ export default function LoginPage() {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ userId, password }),
+                body: JSON.stringify({
+                    companyCode: companyCode.toUpperCase(),
+                    userId,
+                    password
+                }),
             })
 
             if (res.ok) {
                 const data = await res.json()
+                // Save last used company
+                localStorage.setItem('lastCompanyCode', companyCode.toUpperCase())
+
                 toast({
                     title: "Login Berhasil!",
                     description: `Selamat datang, ${data.user?.name || userId}!`,
                     variant: "default",
                 })
-                // Redirect ke home setelah delay untuk menampilkan toast
+                // Redirect based on user type
                 setTimeout(() => {
-                    router.push('/home')
+                    if (data.user?.isSuperAdmin || companyCode.toUpperCase() === 'SUPERADMIN') {
+                        router.push('/admin')
+                    } else {
+                        router.push('/home')
+                    }
                 }, 500)
             } else {
                 const data = await res.json()
@@ -68,15 +127,36 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
-            <Card className="w-full max-w-md">
-                <CardHeader className="space-y-1">
-                    <CardTitle className="text-2xl font-bold text-center">ISO Integrated System</CardTitle>
-                    <CardDescription className="text-center">Masuk ke akun Anda untuk mengakses sistem</CardDescription>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4">
+            <Card className="w-full max-w-md shadow-2xl border-slate-700/50">
+                <CardHeader className="space-y-1 text-center">
+                    <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-2">
+                        <Building2 className="h-8 w-8 text-primary" />
+                    </div>
+                    <CardTitle className="text-2xl font-bold">ISO Integrated System</CardTitle>
+                    <CardDescription>Masuk ke akun Anda untuk mengakses sistem</CardDescription>
                 </CardHeader>
                 <form onSubmit={handleSubmit}>
                     <CardContent className="space-y-4">
-                        {error && <p className="text-sm font-medium text-destructive text-center">{error}</p>}
+                        {error && <p className="text-sm font-medium text-destructive text-center bg-destructive/10 py-2 px-3 rounded-md">{error}</p>}
+
+                        {/* Company Code Input */}
+                        <div className="space-y-2">
+                            <Label htmlFor="company">Kode Perusahaan</Label>
+                            <Input
+                                id="company"
+                                type="text"
+                                placeholder="Masukkan Kode Perusahaan (contoh: PBB)"
+                                value={companyCode}
+                                onChange={(e) => setCompanyCode(e.target.value.toUpperCase())}
+                                required
+                                className="uppercase"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Masukkan kode perusahaan yang diberikan oleh administrator
+                            </p>
+                        </div>
+
                         <div className="space-y-2">
                             <Label htmlFor="userId">User ID</Label>
                             <Input
@@ -113,10 +193,13 @@ export default function LoginPage() {
                             </div>
                         </div>
                     </CardContent>
-                    <CardFooter>
+                    <CardFooter className="flex flex-col gap-3">
                         <Button type="submit" className="w-full" disabled={isLoading}>
                             {isLoading ? "Memproses..." : "Masuk"}
                         </Button>
+                        <p className="text-xs text-muted-foreground text-center">
+                            Hubungi administrator jika Anda lupa kredensial
+                        </p>
                     </CardFooter>
                 </form>
             </Card>

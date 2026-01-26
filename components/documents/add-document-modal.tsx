@@ -58,6 +58,7 @@ export function AddDocumentModal({ isOpen, onClose, documentType, onDocumentAdde
     description: "",
     version: "1.0",
     status: "Draft",
+    classification: "Internal", // Default: Internal
     owner: "",
     department: "",
     scope: "",
@@ -179,6 +180,8 @@ export function AddDocumentModal({ isOpen, onClose, documentType, onDocumentAdde
       const documentPayload = {
         ...formData,
         documentType: documentType,
+        category: documentType, // Untuk kompatibilitas tampilan tabel
+        nextReview: formData.reviewDate || null, // Mapping ke nextReview
         fileId: uploadedFileId,
       };
 
@@ -295,7 +298,7 @@ export function AddDocumentModal({ isOpen, onClose, documentType, onDocumentAdde
             <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder={`Deskripsi ${documentType.toLowerCase()}`} rows={3} />
           </div>
           {getDocumentTypeFields()}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <div>
               <Label htmlFor="status">Status</Label>
               <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
@@ -304,6 +307,17 @@ export function AddDocumentModal({ isOpen, onClose, documentType, onDocumentAdde
                   <SelectItem value="Draft">Draft</SelectItem>
                   <SelectItem value="Review">Review</SelectItem>
                   <SelectItem value="Aktif">Aktif</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="classification">Klasifikasi</Label>
+              <Select value={formData.classification} onValueChange={(value) => setFormData({ ...formData, classification: value })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Public">Public</SelectItem>
+                  <SelectItem value="Internal">Internal</SelectItem>
+                  <SelectItem value="Confidential">Confidential</SelectItem>
                 </SelectContent>
               </Select>
             </div>

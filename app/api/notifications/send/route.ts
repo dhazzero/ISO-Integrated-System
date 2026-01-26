@@ -1,7 +1,7 @@
 // app/api/notifications/send/route.ts
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getTenantDb } from '@/lib/db-helper';
 
 interface NotificationRequest {
     templateId: string;
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
         const body: NotificationRequest = await request.json();
         const { templateId, recipientEmail, recipientName, subject, customContent, data } = body;
 
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
 
         // Get SMTP settings
         const smtpSettings = await db.collection('notification_settings').findOne({ settingsKey: 'smtp' });

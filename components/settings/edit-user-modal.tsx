@@ -17,14 +17,20 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { Department, User as UserType, UserRole } from "@/lib/types"
+import { Department, User as UserType } from "@/lib/types"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { useToast } from "@/components/ui/use-toast"
 import { logActivity } from "@/lib/logger"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
+
+interface RoleInfo {
+    id: string;
+    name: string;
+    description: string;
+}
 
 interface EditUserModalProps {
     isOpen: boolean;
@@ -47,7 +53,7 @@ const formSchema = z.object({
     userId: z.string().min(3, "User ID minimal 3 karakter"),
     email: z.string().email("Format email tidak valid"),
     password: z.union([z.literal(''), passwordValidation]).optional(),
-    role: z.nativeEnum(UserRole),
+    role: z.string().min(1, "Role diperlukan"),
     status: z.enum(['active', 'inactive', 'pending']),
     departmentId: z.string().optional().nullable(),
     supervisorId: z.string().optional().nullable(),
@@ -55,9 +61,29 @@ const formSchema = z.object({
 
 export function EditUserModal({ isOpen, onOpenChange, departments, users, editingUser, onUserUpdated }: EditUserModalProps) {
     const { toast } = useToast();
+    const [availableRoles, setAvailableRoles] = useState<RoleInfo[]>([]);
+
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
     });
+
+    // Fetch roles from API
+    useEffect(() => {
+        const fetchRoles = async () => {
+            try {
+                const res = await fetch('/api/roles');
+                if (res.ok) {
+                    const data = await res.json();
+                    setAvailableRoles(data.roles || []);
+                }
+            } catch (error) {
+                console.error('Failed to fetch roles:', error);
+            }
+        };
+        if (isOpen) {
+            fetchRoles();
+        }
+    }, [isOpen]);
 
     // Pre-fill form when editingUser changes
     useEffect(() => {
@@ -111,6 +137,12 @@ export function EditUserModal({ isOpen, onOpenChange, departments, users, editin
         }
     }
 
+    // Get supervisor-eligible users (managers, admins)
+    const supervisorRoles = ['manager', 'administrator', 'superuser', 'admin'];
+    const eligibleSupervisors = users.filter(u =>
+        u.role && supervisorRoles.includes(u.role.toLowerCase()) && u._id !== editingUser?._id
+    );
+
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-lg">
@@ -122,25 +154,112 @@ export function EditUserModal({ isOpen, onOpenChange, departments, users, editin
                 </DialogHeader>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                        {/* Form fields are similar to AddUserModal, but with pre-filled values */}
                         {/* Name and UserID */}
                         <div className="grid grid-cols-2 gap-4">
-                            <FormField control={form.control} name="name" render={({ field }) => (<FormItem> <FormLabel>Nama Lengkap</FormLabel> <FormControl><Input {...field} /></FormControl> <FormMessage /> </FormItem>)} />
-                            <FormField control={form.control} name="userId" render={({ field }) => (<FormItem> <FormLabel>User ID</FormLabel> <FormControl><Input {...field} /></FormControl> <FormMessage /> </FormItem>)} />
+                            <FormField control={form.control} name="name" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Nama Lengkap</FormLabel>
+                                    <FormControl><Input {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                            <FormField control={form.control} name="userId" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>User ID</FormLabel>
+                                    <FormControl><Input {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
                         </div>
                         {/* Email */}
-                        <FormField control={form.control} name="email" render={({ field }) => (<FormItem> <FormLabel>Email</FormLabel> <FormControl><Input type="email" {...field} /></FormControl> <FormMessage /> </FormItem>)} />
+                        <FormField control={form.control} name="email" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Email</FormLabel>
+                                <FormControl><Input type="email" {...field} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
                         {/* Password */}
-                        <FormField control={form.control} name="password" render={({ field }) => (<FormItem> <FormLabel>Password Baru (Opsional)</FormLabel> <FormControl><Input type="password" {...field} placeholder="Kosongkan jika tidak berubah" /></FormControl> <FormMessage /> </FormItem>)} />
+                        <FormField control={form.control} name="password" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Password Baru (Opsional)</FormLabel>
+                                <FormControl><Input type="password" {...field} placeholder="Kosongkan jika tidak berubah" /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
                         {/* Role and Status */}
                         <div className="grid grid-cols-2 gap-4">
-                            <FormField control={form.control} name="role" render={({ field }) => (<FormItem> <FormLabel>Role</FormLabel> <Select onValueChange={field.onChange} value={field.value}> <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl> <SelectContent>{Object.values(UserRole).map(role => (<SelectItem key={role} value={role}>{role.charAt(0).toUpperCase() + role.slice(1)}</SelectItem>))}</SelectContent> </Select> <FormMessage /> </FormItem>)} />
-                            <FormField control={form.control} name="status" render={({ field }) => (<FormItem> <FormLabel>Status</FormLabel> <Select onValueChange={field.onChange} value={field.value}> <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl> <SelectContent>{['active', 'inactive', 'pending'].map(s => (<SelectItem key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>))}</SelectContent> </Select> <FormMessage /> </FormItem>)} />
+                            <FormField control={form.control} name="role" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Role</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger><SelectValue placeholder="Pilih role" /></SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {availableRoles.map(role => (
+                                                <SelectItem key={role.id} value={role.id}>
+                                                    {role.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                            <FormField control={form.control} name="status" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Status</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="active">Active</SelectItem>
+                                            <SelectItem value="inactive">Inactive</SelectItem>
+                                            <SelectItem value="pending">Pending</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
                         </div>
                         {/* Department */}
-                        <FormField control={form.control} name="departmentId" render={({ field }) => (<FormItem> <FormLabel>Departemen</FormLabel> <Select onValueChange={field.onChange} value={field.value || "null"}> <FormControl><SelectTrigger><SelectValue placeholder="Pilih departemen" /></SelectTrigger></FormControl> <SelectContent><SelectItem value="null">Tidak ada</SelectItem>{departments.map(d => (<SelectItem key={d._id.toString()} value={d._id.toString()}>{d.name}</SelectItem>))}</SelectContent> </Select> <FormMessage /> </FormItem>)} />
+                        <FormField control={form.control} name="departmentId" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Departemen</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value || "null"}>
+                                    <FormControl>
+                                        <SelectTrigger><SelectValue placeholder="Pilih departemen" /></SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="null">Tidak ada</SelectItem>
+                                        {departments.map(d => (
+                                            <SelectItem key={d._id.toString()} value={d._id.toString()}>{d.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
                         {/* Supervisor */}
-                        <FormField control={form.control} name="supervisorId" render={({ field }) => (<FormItem> <FormLabel>Atasan Langsung</FormLabel> <Select onValueChange={field.onChange} value={field.value || "null"}> <FormControl><SelectTrigger><SelectValue placeholder="Pilih atasan" /></SelectTrigger></FormControl> <SelectContent><SelectItem value="null">Tidak ada</SelectItem>{users.filter(u => u.role === UserRole.MANAGER || u.role === UserRole.ADMINISTRATOR && u._id !== editingUser?._id).map(u => (<SelectItem key={u._id.toString()} value={u._id.toString()}>{u.name}</SelectItem>))}</SelectContent> </Select> <FormMessage /> </FormItem>)} />
+                        <FormField control={form.control} name="supervisorId" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Atasan Langsung</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value || "null"}>
+                                    <FormControl>
+                                        <SelectTrigger><SelectValue placeholder="Pilih atasan" /></SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="null">Tidak ada</SelectItem>
+                                        {eligibleSupervisors.map(u => (
+                                            <SelectItem key={u._id.toString()} value={u._id.toString()}>{u.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
 
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Batal</Button>

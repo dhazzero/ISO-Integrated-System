@@ -1,57 +1,44 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { jwtVerify } from 'jose';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getTenantDb } from '@/lib/db-helper';
 
 const COOKIE_NAME = 'session';
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-super-secret-jwt-key-that-is-at-least-32-bytes-long');
 const LOGS_COLLECTION = 'security_logs';
 
 export async function POST(request: Request) {
     try {
         const cookieStore = await cookies();
-        const token = cookieStore.get(COOKIE_NAME)?.value;
 
-        // Try to get user info from token before deleting for logging
-        let userName = 'Unknown User';
-        let userId = null;
-        let userRole = null;
-
-        if (token) {
-            try {
-                const { payload } = await jwtVerify(token, JWT_SECRET);
-                userName = payload.name as string || payload.username as string || 'Unknown User';
-                userId = payload.userId as string || null;
-                userRole = payload.role as string || null;
-            } catch (decodeError) {
-                console.error('Failed to decode token for logout logging:', decodeError);
-            }
-        }
-
-        // Get client IP address
+        // Get client IP
         const ipAddress = request.headers.get('x-forwarded-for') ||
             request.headers.get('x-real-ip') ||
             '127.0.0.1';
 
-        // Log logout action
+        // Log logout action to tenant database
         try {
-            const { db } = await connectToDatabase();
-            await db.collection(LOGS_COLLECTION).insertOne({
-                action: 'LOGOUT',
-                module: 'Keamanan',
-                description: `User ${userName} logout dari sistem`,
-                details: {
-                    userRole: userRole,
-                },
-                userId: userId,
-                userName: userName,
-                userRole: userRole,
-                timestamp: new Date(),
-                ip: ipAddress,
-            });
+            // getTenantDb will fetch the current user and their tenant connection
+            // We use this to log the logout event into the correct tenant's log
+            const { db, user } = await getTenantDb();
+
+            if (user) {
+                await db.collection(LOGS_COLLECTION).insertOne({
+                    action: 'LOGOUT',
+                    module: 'Keamanan',
+                    description: `User ${user.userName} logout dari sistem`,
+                    details: {
+                        userRole: user.userRole,
+                    },
+                    userId: user.userId,
+                    userName: user.userName,
+                    userRole: user.userRole,
+                    timestamp: new Date(),
+                    ip: ipAddress,
+                });
+            }
         } catch (logError) {
-            console.error('Failed to log logout activity:', logError);
-            // Continue with logout even if logging fails
+            // If getTenantDb fails (e.g. invalid session), we just skip logging
+            // and proceed to logout (clear cookie)
+            console.warn('Failed to log logout activity (likely already logged out or invalid session):', logError);
         }
 
         // Hapus cookie
@@ -60,7 +47,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ message: 'Logout berhasil' });
     } catch (error) {
         console.error('Logout error:', error);
+        // Even if error, try to clear cookie if possible? 
+        // But headers are immutable in Next response unless returning a new one with cookies.delete.
+        // We typically want to force logout on error too.
+
+        // Ensure even on error we return a response that might signal logout, 
+        // but cleaner to just standard error here.
         return NextResponse.json({ message: 'Terjadi kesalahan saat logout' }, { status: 500 });
     }
 }
-

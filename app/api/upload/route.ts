@@ -1,12 +1,12 @@
 // app/api/upload/route.ts
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb'; //
-import { GridFSBucket, ObjectId } from 'mongodb';
+import { getTenantDb } from '@/lib/db-helper';
+import { GridFSBucket } from 'mongodb';
 import { Readable } from 'stream';
 
 export async function POST(request: Request) {
     try {
-        const { db } = await connectToDatabase(); //
+        const { db, user } = await getTenantDb();
         const bucket = new GridFSBucket(db, { bucketName: 'uploads' });
 
         const formData = await request.formData();
@@ -24,8 +24,8 @@ export async function POST(request: Request) {
             contentType: file.type,
             metadata: {
                 originalName: file.name,
-                uploader: "user_id_placeholder", // Nanti bisa diganti dengan user ID aktual
-                // Tambahkan metadata lain jika perlu
+                uploader: user.userId || "unknown",
+                uploaderName: user.userName || "Unknown User",
             }
         });
 
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({
             message: 'File uploaded successfully',
-            fileId: uploadStream.id.toHexString(), // Mengembalikan ID file yang diupload
+            fileId: uploadStream.id.toHexString(),
             filename: file.name,
             contentType: file.type,
             length: uploadStream.length,

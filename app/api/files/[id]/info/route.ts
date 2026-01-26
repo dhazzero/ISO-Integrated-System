@@ -1,12 +1,12 @@
 // app/api/files/[id]/info/route.ts
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getTenantDb } from '@/lib/db-helper';
 import { ObjectId } from 'mongodb';
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
     try {
         const { id: fileIdString } = params;
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
 
         if (!fileIdString || !ObjectId.isValid(fileIdString)) {
             return NextResponse.json({ message: 'Invalid file ID' }, { status: 400 });

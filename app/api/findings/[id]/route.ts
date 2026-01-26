@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getTenantDb } from '@/lib/db-helper';
 import { ObjectId } from 'mongodb';
 
 const FINDINGS_COLLECTION = 'findings';
@@ -8,11 +8,10 @@ const AUDITS_COLLECTION = 'audits';
 export async function GET(request: Request, { params }: { params: { id: string } }) {
     try {
         const { id } = params;
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         if (!id || !ObjectId.isValid(id)) {
             return NextResponse.json({ message: 'ID Finding tidak valid atau tidak ada' }, { status: 400 });
         }
-
         const finding = await db.collection(FINDINGS_COLLECTION).findOne({ _id: new ObjectId(id) });
         if (!finding) {
             return NextResponse.json({ message: 'Finding tidak ditemukan' }, { status: 404 });
@@ -25,13 +24,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
     try {
-
         const { id } = params;
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         if (!id || !ObjectId.isValid(id)) {
             return NextResponse.json({ message: 'ID Finding tidak valid' }, { status: 400 });
         }
-
         const data = await request.json();
         delete data._id;
 

@@ -41,14 +41,13 @@ const formatDate = (dateString: string | null | undefined): string => {
         const date = new Date(dateString);
         if (isNaN(date.getTime())) return dateString; // Return original if invalid
 
-        // Format: DD/MM/YYYY HH:mm
+        // Format: dd-MMM-yyyy (contoh: 13-Jan-2026)
         const day = date.getDate().toString().padStart(2, '0');
-        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const month = months[date.getMonth()];
         const year = date.getFullYear();
-        const hours = date.getHours().toString().padStart(2, '0');
-        const minutes = date.getMinutes().toString().padStart(2, '0');
 
-        return `${day}/${month}/${year} ${hours}:${minutes}`;
+        return `${day}-${month}-${year}`;
     } catch {
         return dateString;
     }
@@ -60,6 +59,7 @@ interface DocumentItem {
     name: string;
     version: string;
     status: "Aktif" | "Review" | "Draft" | "Expired";
+    classification?: "Public" | "Internal" | "Confidential"; // Klasifikasi dokumen
     approver?: string;
     owner?: string;
     department?: string;
@@ -67,6 +67,8 @@ interface DocumentItem {
     usage?: string;
     updatedAt: string;
     nextReview: string;
+    reviewDate?: string; // Tanggal review dokumen
+    effectiveDate?: string; // Tanggal efektif dokumen
     description: string;
     fileId?: string; // Untuk menyimpan ID file dari GridFS
     documentType?: string; // atau category
@@ -119,6 +121,9 @@ export default function DocumentsPage() {
                 ...doc,
                 id: doc.id ?? doc._id ?? doc._id?.toString?.() ?? '',
                 fileId: doc.fileId?.toString?.(),
+                // Fallback untuk kompatibilitas dokumen lama
+                category: doc.category || doc.documentType || '',
+                nextReview: doc.nextReview || doc.reviewDate || '',
             }));
 
             setPolicies(allDocuments.filter(doc => doc.documentType === "Kebijakan" || doc.category === "Kebijakan"));
@@ -143,7 +148,8 @@ export default function DocumentsPage() {
                 const res = await fetch('/api/auth/me');
                 if (res.ok) {
                     const data = await res.json();
-                    setPermissions(data.permissions);
+                    // Permissions are inside user object
+                    setPermissions(data.user?.permissions || null);
                 }
             } catch (err) {
                 console.error('Failed to fetch permissions:', err);
@@ -187,6 +193,19 @@ export default function DocumentsPage() {
                 return <AlertCircle className="h-4 w-4 text-red-500" />
             default:
                 return <FileText className="h-4 w-4 text-gray-500" />
+        }
+    }
+
+    const getClassificationBadge = (classification?: string) => {
+        switch (classification) {
+            case "Public":
+                return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">Public</Badge>
+            case "Internal":
+                return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">Internal</Badge>
+            case "Confidential":
+                return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100">Confidential</Badge>
+            default:
+                return <Badge variant="secondary">-</Badge>
         }
     }
 
@@ -250,6 +269,7 @@ export default function DocumentsPage() {
                         <th className="text-left py-3 px-4">Nama Dokumen</th>
                         <th className="text-left py-3 px-4">Versi</th>
                         <th className="text-left py-3 px-4">Status</th>
+                        <th className="text-left py-3 px-4">Klasifikasi</th>
                         {extraColumns.map((col) => (
                             <th key={col} className="text-left py-3 px-4">
                                 {col === "approver" ? "Approver" :
@@ -260,8 +280,8 @@ export default function DocumentsPage() {
                                                     col === "category" ? "Kategori" : col}
                             </th>
                         ))}
-                        <th className="text-left py-3 px-4">Terakhir Diperbarui</th>
-                        <th className="text-left py-3 px-4">Review Berikutnya</th>
+                        <th className="text-left py-3 px-4">Tanggal Efektif</th>
+                        <th className="text-left py-3 px-4">Tanggal Review</th>
                         <th className="text-left py-3 px-4">Tindakan</th>
                     </tr>
                 </thead>
@@ -286,14 +306,15 @@ export default function DocumentsPage() {
                                 </td>
                                 <td className="py-3 px-4">{doc.version}</td>
                                 <td className="py-3 px-4">{getStatusBadge(doc.status)}</td>
+                                <td className="py-3 px-4">{getClassificationBadge(doc.classification)}</td>
                                 {extraColumns.map((colKey) => (
                                     <td key={colKey} className="py-3 px-4">
                                         {/* @ts-ignore */}
                                         {doc[colKey] || "-"}
                                     </td>
                                 ))}
-                                <td className="py-3 px-4">{formatDate(doc.updatedAt)}</td>
-                                <td className="py-3 px-4">{formatDate(doc.nextReview)}</td>
+                                <td className="py-3 px-4">{formatDate(doc.effectiveDate)}</td>
+                                <td className="py-3 px-4">{formatDate(doc.reviewDate || doc.nextReview)}</td>
                                 <td className="py-3 px-4">
                                     <div className="flex space-x-1">
                                         <Button variant="ghost" size="icon" title="Lihat" onClick={() => handleViewDocument(doc)}>

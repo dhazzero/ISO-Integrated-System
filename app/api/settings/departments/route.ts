@@ -1,12 +1,12 @@
 // app/api/settings/departments/route.ts
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getTenantDb } from '@/lib/db-helper';
 
 const DEPARTMENTS_COLLECTION = 'departments';
 
 export async function GET() {
     try {
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         const departments = await db.collection(DEPARTMENTS_COLLECTION).find({}).sort({ name: 1 }).toArray();
         return NextResponse.json(departments);
     } catch (error) {
@@ -17,7 +17,7 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const data = await request.json();
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         if (!data.name || !data.head) {
             return NextResponse.json({ message: 'Nama dan kepala departemen wajib diisi' }, { status: 400 });
         }

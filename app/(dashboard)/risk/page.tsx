@@ -51,8 +51,8 @@ export default function RiskPage() {
         fetchRisks();
         // Check user permission from API
         fetch('/api/auth/me').then(res => res.json()).then(data => {
-            // Use permissions.canEdit from API - this respects the central auth system
-            setUserCanEdit(data?.permissions?.canEdit || false);
+            // Permissions are inside user object
+            setUserCanEdit(data?.user?.permissions?.canEdit || false);
         }).catch(() => setUserCanEdit(false));
     }, []);
 

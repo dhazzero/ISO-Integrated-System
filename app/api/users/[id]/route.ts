@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
-import { User, UserRole } from '@/lib/types';
+import { getTenantDb } from '@/lib/db-helper';
+import { User } from '@/lib/types';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { ObjectId } from 'mongodb';
@@ -12,12 +12,12 @@ const passwordValidation = z.string()
     .refine(value => /\d/.test(value), { message: "Password harus mengandung setidaknya satu angka." })
     .refine(value => /[@$!%*?&]/.test(value), { message: "Password harus mengandung setidaknya satu karakter spesial (@$!%*?&)." });
 
-// Skema untuk validasi update
+// Skema untuk validasi update (using string for dynamic roles)
 const updateUserSchema = z.object({
     name: z.string().min(1, "Nama diperlukan"),
     userId: z.string().min(1, "User ID diperlukan"),
     email: z.string().email("Email tidak valid"),
-    role: z.nativeEnum(UserRole),
+    role: z.string().min(1, "Role diperlukan"),
     departmentId: z.string().optional().nullable(),
     supervisorId: z.string().optional().nullable(),
     status: z.enum(['active', 'inactive', 'pending']),
@@ -28,7 +28,7 @@ const updateUserSchema = z.object({
 // --- GET: Mengambil data satu pengguna ---
 export async function GET(request: Request, { params }: { params: { id: string } }) {
     try {
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         const { id } = params;
 
         if (!ObjectId.isValid(id)) {
@@ -54,7 +54,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 // --- PUT: Memperbarui data pengguna ---
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
     try {
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         const { id } = params;
 
         if (!ObjectId.isValid(id)) {

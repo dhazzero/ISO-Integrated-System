@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getTenantDb } from '@/lib/db-helper';
 import { ObjectId } from 'mongodb';
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
     try {
         const body = await req.json();
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         const { id } = params;
         await db.collection('integrated-standard-table').updateOne({ _id: new ObjectId(id) }, { $set: body });
         return NextResponse.json({ _id: id, ...body });
@@ -19,13 +19,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
 export async function DELETE(_: Request, { params }: { params: { id: string } }) {
     try {
-        // Authorization check - only SUPERUSER can delete
         const { canDelete, unauthorizedDeleteResponse } = await import('@/lib/auth');
         if (!(await canDelete())) {
             return NextResponse.json(unauthorizedDeleteResponse(), { status: 403 });
         }
 
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         const { id } = params;
         await db.collection('integrated-standard-table').deleteOne({ _id: new ObjectId(id) });
         return NextResponse.json({ _id: id });
@@ -39,7 +38,7 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
 
 export async function GET(_: Request, { params }: { params: { id: string } }) {
     try {
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
         const { id } = params;
         const record = await db
             .collection('integrated-standard-table')

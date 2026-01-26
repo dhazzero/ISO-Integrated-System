@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
-import { connectToDatabase } from "@/lib/mongodb"
+import { getTenantDb } from "@/lib/db-helper"
 import { NextRequest } from "next/server"
 
 const TRAININGS_COLLECTION = 'trainings'
 
 export async function GET() {
     try {
-        const { db } = await connectToDatabase()
+        const { db } = await getTenantDb()
         const trainings = await db.collection(TRAININGS_COLLECTION).find({}).toArray()
         return NextResponse.json(trainings)
     } catch (error) {
@@ -16,10 +16,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
     try {
-        const { db } = await connectToDatabase()
+        const { db } = await getTenantDb()
         const body = await request.json()
 
-        // Basic validation since we don't have Mongoose schemas anymore
         if (!body.name || !body.category || !body.participants || !body.date || !body.status) {
             return NextResponse.json({ message: "Missing required fields" }, { status: 400 })
         }

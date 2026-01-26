@@ -9,6 +9,7 @@ import {
   ClipboardList,
   AlertTriangle,
   FileCheck,
+  FileSearch,
   BarChart,
   GraduationCap,
   Settings,
@@ -32,7 +33,12 @@ export function MainNav() {
         const response = await fetch('/api/auth/me')
         if (response.ok) {
           const data = await response.json()
-          setPermissions(data.permissions)
+          // Support both old format (data.permissions) and new format (data.user.permissions)
+          if (data.user?.permissions) {
+            setPermissions(data.user.permissions)
+          } else if (data.permissions) {
+            setPermissions(data.permissions)
+          }
         }
       } catch (error) {
         console.error('Failed to fetch permissions:', error)
@@ -74,8 +80,15 @@ export function MainNav() {
       href: "/audit",
       label: "Audit",
       icon: <FileCheck className="h-5 w-5 mr-2" />,
-      active: pathname.startsWith("/audit"),
+      active: pathname.startsWith("/audit") && !pathname.startsWith("/audit-logs"),
       requiresPermission: 'canViewAudit', // STAFF cannot view
+    },
+    {
+      href: "/audit-logs",
+      label: "Audit Trail",
+      icon: <FileSearch className="h-5 w-5 mr-2" />,
+      active: pathname.startsWith("/audit-logs"),
+      requiresPermission: 'canViewAudit', // For audit access only
     },
     {
       href: "/reports",

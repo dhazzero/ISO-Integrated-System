@@ -1,14 +1,13 @@
 // app/api/documents/route.ts
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getTenantDb } from '@/lib/db-helper';
 import { logActivityServer, LogAction, LogModule } from '@/lib/server-logger';
-import { getCurrentUser } from '@/lib/auth';
 
 const COLLECTION_NAME = 'documents';
 
 export async function GET(request: Request) {
     try {
-        const { db } = await connectToDatabase();
+        const { db } = await getTenantDb();
 
         const docsRaw = await db.collection(COLLECTION_NAME)
             .find({})
@@ -32,8 +31,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     try {
         const data = await request.json();
-        const { db } = await connectToDatabase();
-        const currentUser = await getCurrentUser();
+        const { db, user } = await getTenantDb();
 
         if (!data.name || !data.documentType) {
             return NextResponse.json({ message: 'Missing required fields: name, documentType' }, { status: 400 });
@@ -41,9 +39,11 @@ export async function POST(request: Request) {
 
         const newDocumentData = {
             ...data,
+            category: data.documentType, // Duplikasi untuk kompatibilitas tampilan tabel
+            nextReview: data.reviewDate || null, // Mapping reviewDate ke nextReview
             createdAt: new Date(),
             updatedAt: new Date(),
-            createdBy: currentUser?.userName || 'System',
+            createdBy: user.userName || 'System',
         };
 
         const result = await db.collection(COLLECTION_NAME).insertOne(newDocumentData);

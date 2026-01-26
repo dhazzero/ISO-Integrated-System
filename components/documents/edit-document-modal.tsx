@@ -47,8 +47,9 @@ interface EditDocumentModalProps {
 
 export function EditDocumentModal({ isOpen, onClose, document, onUpdated }: EditDocumentModalProps) {
   const [formData, setFormData] = useState({
-    name: "", description: "", version: "", status: "", owner: "",
+    name: "", description: "", version: "", status: "", classification: "", owner: "",
     department: "", scope: "", approver: "", reviewDate: "", effectiveDate: "",
+    documentType: "", category: "",
   });
   const [saving, setSaving] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -62,17 +63,21 @@ export function EditDocumentModal({ isOpen, onClose, document, onUpdated }: Edit
 
   useEffect(() => {
     if (document) {
+      const docType = document.documentType || document.category || "";
       setFormData({
         name: document.name || "",
         description: document.description || "",
         version: document.version || "1.0",
         status: document.status || "Draft",
+        classification: document.classification || "Internal",
         owner: document.owner || "",
         department: document.department || "",
         scope: document.scope || "",
         approver: document.approver || "",
         reviewDate: document.reviewDate ? new Date(document.reviewDate).toISOString().split('T')[0] : "",
         effectiveDate: document.effectiveDate ? new Date(document.effectiveDate).toISOString().split('T')[0] : "",
+        documentType: docType,
+        category: docType,
       });
     }
     setSelectedFile(null);
@@ -139,6 +144,10 @@ export function EditDocumentModal({ isOpen, onClose, document, onUpdated }: Edit
       Object.entries(formData).forEach(([key, value]) => {
         payload.append(key, value as string);
       });
+      // Tambahkan nextReview yang di-sync dengan reviewDate
+      if (formData.reviewDate) {
+        payload.append('nextReview', formData.reviewDate);
+      }
       if (selectedFile) {
         payload.append('file', selectedFile);
       }
@@ -252,7 +261,7 @@ export function EditDocumentModal({ isOpen, onClose, document, onUpdated }: Edit
             <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} />
           </div>
           {getDocumentTypeFields()}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <div>
               <Label htmlFor="status">Status</Label>
               <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
@@ -261,6 +270,17 @@ export function EditDocumentModal({ isOpen, onClose, document, onUpdated }: Edit
                   <SelectItem value="Draft">Draft</SelectItem>
                   <SelectItem value="Review">Review</SelectItem>
                   <SelectItem value="Aktif">Aktif</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="classification">Klasifikasi</Label>
+              <Select value={formData.classification} onValueChange={(value) => setFormData({ ...formData, classification: value })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Public">Public</SelectItem>
+                  <SelectItem value="Internal">Internal</SelectItem>
+                  <SelectItem value="Confidential">Confidential</SelectItem>
                 </SelectContent>
               </Select>
             </div>

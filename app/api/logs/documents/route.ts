@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { connectToDatabase } from '@/lib/mongodb'
+import { getTenantDb } from '@/lib/db-helper'
 
 export async function GET() {
   try {
-    const { db } = await connectToDatabase()
+    const { db } = await getTenantDb()
     const logsRaw = await db.collection('documentLogs').find({}).sort({ timestamp: -1 }).toArray()
     const logs = logsRaw.map((l: any) => ({ ...l, id: l._id.toString() }))
     return NextResponse.json(logs)

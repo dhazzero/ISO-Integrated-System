@@ -1,20 +1,12 @@
 import { NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { getTenantDb } from '@/lib/db-helper';
 
-// Store all compliance controls in the same "compliance" collection
-// used by Annex A so the checklist reflects database changes
 const CONTROLS_COLLECTION = 'compliance';
 
-// GET all controls
 export async function GET() {
     try {
-        const { db } = await connectToDatabase();
-        // Exclude Annex A records which are managed separately
-        const controlsRaw = await db
-            .collection(CONTROLS_COLLECTION)
-            .find({ category: { $ne: 'Annex A' } })
-            .sort({ name: 1 })
-            .toArray();
+        const { db } = await getTenantDb();
+        const controlsRaw = await db.collection(CONTROLS_COLLECTION).find({ category: { $ne: 'Annex A' } }).sort({ name: 1 }).toArray();
         const controls = controlsRaw.map((c: any) => ({ ...c, _id: c._id.toString() }));
         return NextResponse.json(controls, { status: 200 });
     } catch (error) {
@@ -23,17 +15,13 @@ export async function GET() {
     }
 }
 
-// POST a new control
 export async function POST(request: Request) {
     try {
         const data = await request.json();
-        const { db } = await connectToDatabase();
-
-        // Allow controls to be created even if optional owner/compliance fields are blank
+        const { db } = await getTenantDb();
         if (!data.name || !data.category || !data.status || !data.effectiveness) {
             return NextResponse.json({ message: 'Missing required fields for control' }, { status: 400 });
         }
-
         const newControl = {
             name: data.name,
             description: data.description || "",
@@ -47,7 +35,6 @@ export async function POST(request: Request) {
             createdAt: new Date(),
             updatedAt: new Date(),
         };
-
         const result = await db.collection(CONTROLS_COLLECTION).insertOne(newControl);
         const insertedControl = await db.collection(CONTROLS_COLLECTION).findOne({ _id: result.insertedId });
         if (!insertedControl) return NextResponse.json({ message: 'Failed to create control' }, { status: 500 })

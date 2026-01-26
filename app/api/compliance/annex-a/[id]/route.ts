@@ -1,18 +1,13 @@
 import { NextResponse } from 'next/server'
 import { ObjectId } from 'mongodb'
-import { connectToDatabase } from '@/lib/mongodb'
+import { getTenantDb } from '@/lib/db-helper'
 
 const COLLECTION = 'compliance'
 
-export async function GET(
-    _req: Request,
-    { params }: { params: { id: string } }
-) {
+export async function GET(_req: Request, { params }: { params: { id: string } }) {
     try {
-        const { db } = await connectToDatabase()
-        const control = await db
-            .collection(COLLECTION)
-            .findOne({ _id: new ObjectId(params.id) })
+        const { db } = await getTenantDb()
+        const control = await db.collection(COLLECTION).findOne({ _id: new ObjectId(params.id) })
         if (!control) {
             return NextResponse.json({ message: 'Not found' }, { status: 404 })
         }
@@ -23,21 +18,13 @@ export async function GET(
     }
 }
 
-export async function PATCH(
-    req: Request,
-    { params }: { params: { id: string } }
-) {
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
     try {
         const data = await req.json()
-        const { db } = await connectToDatabase()
-        const update = {
-            ...data,
-            updatedAt: new Date(),
-        }
+        const { db } = await getTenantDb()
+        const update = { ...data, updatedAt: new Date() }
         await db.collection(COLLECTION).updateOne({ _id: new ObjectId(params.id) }, { $set: update })
-        const updated = await db
-            .collection(COLLECTION)
-            .findOne({ _id: new ObjectId(params.id) })
+        const updated = await db.collection(COLLECTION).findOne({ _id: new ObjectId(params.id) })
         if (!updated) {
             return NextResponse.json({ message: 'Not found' }, { status: 404 })
         }
