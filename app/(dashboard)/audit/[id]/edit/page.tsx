@@ -1,0 +1,272 @@
+"use client"
+
+import { useState, useEffect, FormEvent } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/components/ui/use-toast";
+import Link from "next/link";
+import { ArrowLeft, Save } from "lucide-react";
+
+interface AuditData {
+    name: string
+    standard: string | string[]
+    department: string
+    auditType: string
+    tujuan?: string
+    date: string
+    auditor: string
+    scheduledTime?: string
+}
+
+interface Option {
+    _id: string
+    name: string
+}
+
+export default function EditAuditPage() {
+    const params = useParams();
+    const router = useRouter();
+    const { toast } = useToast();
+    const auditId = params.id as string;
+
+    const [formData, setFormData] = useState<Partial<AuditData>>({});
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
+    const [standards, setStandards] = useState<Option[]>([]);
+    const [departments, setDepartments] = useState<Option[]>([]);
+    const [selectedStandards, setSelectedStandards] = useState<string[]>([]);
+    const [isLoadingOptions, setIsLoadingOptions] = useState(false);
+    const [certificationBody, setCertificationBody] = useState("");
+    const [externalAuditDepartment, setExternalAuditDepartment] = useState("");
+
+    useEffect(() => {
+        if (!auditId) return;
+        const fetchData = async () => {
+            setIsLoadingOptions(true);
+            try {
+                const [auditRes, sRes, dRes] = await Promise.all([
+                    fetch(`/api/audits/${auditId}`),
+                    fetch('/api/settings/standards'),
+                    fetch('/api/settings/departments'),
+                ]);
+                if (!auditRes.ok) throw new Error('Gagal mengambil data audit.');
+                if (!sRes.ok) throw new Error('Gagal memuat standar');
+                if (!dRes.ok) throw new Error('Gagal memuat departemen');
+
+                const auditData = await auditRes.json();
+                auditData.date = new Date(auditData.date).toISOString().split('T')[0];
+                setFormData(auditData);
+                setSelectedStandards(Array.isArray(auditData.standard) ? auditData.standard : auditData.standard ? [auditData.standard] : []);
+
+                if (auditData.auditType === 'External' && auditData.department) {
+                    const bodyMatch = auditData.department.match(/Lembaga: (.*?),/);
+                    const deptMatch = auditData.department.match(/Departemen: (.*)/);
+                    if (bodyMatch) setCertificationBody(bodyMatch[1].trim());
+                    if (deptMatch) setExternalAuditDepartment(deptMatch[1].trim());
+                }
+
+                setStandards(await sRes.json());
+                setDepartments(await dRes.json());
+            } catch (error) {
+                toast({ variant: 'destructive', title: 'Error', description: (error as Error).message });
+            } finally {
+                setIsLoading(false);
+                setIsLoadingOptions(false);
+            }
+        };
+        fetchData();
+    }, [auditId, toast]);
+
+    const handleInputChange = (field: keyof AuditData, value: string) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleSubmit = async (e: FormEvent) => {
+        e.preventDefault();
+        setIsSaving(true);
+        try {
+            const finalDepartment = formData.auditType === 'External'
+                ? `Lembaga: ${certificationBody}, Departemen: ${externalAuditDepartment}`
+                : formData.department;
+
+            const payload = { ...formData, standard: selectedStandards, department: finalDepartment };
+            const response = await fetch(`/api/audits/${auditId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            if (!response.ok) throw new Error("Gagal memperbarui audit.");
+            toast({ title: "Sukses!", description: "Audit berhasil diperbarui." });
+            router.push(`/audit`);
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: (error as Error).message });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    if (isLoading) return <div className="container p-6 text-center">Memuat form edit...</div>;
+
+    return (
+        <div className="container mx-auto px-4 py-6">
+            <div className="flex items-center space-x-4 mb-6"><Link href="/audit"><Button variant="outline" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link><div><h1 className="text-3xl font-bold">Edit Audit</h1></div></div>
+            <form onSubmit={handleSubmit}>
+                <Card>
+                    <CardHeader><CardTitle>Edit Informasi Audit</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="name">Nama Audit *</Label>
+                                <Input
+                                    id="name"
+                                    value={formData.name || ''}
+                                    onChange={e => handleInputChange('name', e.target.value)}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Standar *</Label>
+                                <div className="space-y-2 max-h-40 overflow-y-auto border p-2 rounded-md bg-background">
+                                    {isLoadingOptions ? (
+                                        <p className="text-sm text-muted-foreground">Memuat standar...</p>
+                                    ) : standards.length > 0 ? (
+                                        standards.map((s) => (
+                                            <div key={s._id} className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    id={`std-${s._id}`}
+                                                    checked={selectedStandards.includes(s.name)}
+                                                    onCheckedChange={(checked) =>
+                                                        setSelectedStandards((prev) =>
+                                                            checked ? [...prev, s.name] : prev.filter((name) => name !== s.name)
+                                                        )
+                                                    }
+                                                />
+                                                <Label htmlFor={`std-${s._id}`}>{s.name}</Label>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">Tidak ada standar yang ditemukan. Tambahkan di menu Pengaturan.</p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="auditType">Jenis Audit *</Label>
+                                <Select value={formData.auditType} onValueChange={(v) => handleInputChange("auditType", v)}>
+                                    <SelectTrigger id="auditType">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Internal">Audit Internal</SelectItem>
+                                        <SelectItem value="External">Audit Eksternal</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            {formData.auditType === 'External' && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="tujuan">Tujuan Audit *</Label>
+                                    <Select
+                                        required
+                                        value={formData.tujuan || ''}
+                                        onValueChange={(v) => handleInputChange('tujuan', v)}
+                                    >
+                                        <SelectTrigger id="tujuan">
+                                            <SelectValue placeholder="Pilih tujuan" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Initial">Initial</SelectItem>
+                                            <SelectItem value="Surveillance">Surveillance</SelectItem>
+                                            <SelectItem value="Re-certification">Re-certification</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+                            {formData.auditType === 'External' ? (
+                                <>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="cert_body">Lembaga Sertifikasi *</Label>
+                                        <Input
+                                            id="cert_body"
+                                            value={certificationBody}
+                                            onChange={e => setCertificationBody(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="dept_ext">Departemen yang Diaudit *</Label>
+                                        <Select required value={externalAuditDepartment} onValueChange={setExternalAuditDepartment}>
+                                            <SelectTrigger id="dept_ext">
+                                                <SelectValue placeholder={isLoadingOptions ? 'Memuat...' : 'Pilih departemen'} />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {isLoadingOptions ? (
+                                                    <SelectItem value="loading" disabled>Memuat...</SelectItem>
+                                                ) : (
+                                                    departments.map(d => <SelectItem key={d._id} value={d.name}>{d.name}</SelectItem>)
+                                                )}
+                                                <SelectItem value="Semua Departemen">Semua Departemen</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="space-y-2">
+                                    <Label htmlFor="dept_int">Departemen *</Label>
+                                    <Select required value={formData.department || ''} onValueChange={v => handleInputChange('department', v)}>
+                                        <SelectTrigger id="dept_int">
+                                            <SelectValue placeholder={isLoadingOptions ? 'Memuat...' : 'Pilih departemen'} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {isLoadingOptions ? (
+                                                <SelectItem value="loading" disabled>Memuat...</SelectItem>
+                                            ) : (
+                                                departments.map(d => <SelectItem key={d._id} value={d.name}>{d.name}</SelectItem>)
+                                            )}
+                                            <SelectItem value="Semua Departemen">Semua Departemen</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+                            <div className="space-y-2">
+                                <Label htmlFor="auditor">Auditor *</Label>
+                                <Input
+                                    id="auditor"
+                                    value={formData.auditor || ''}
+                                    onChange={e => handleInputChange('auditor', e.target.value)}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="date">Tanggal Audit *</Label>
+                                <Input
+                                    id="date"
+                                    type="date"
+                                    value={formData.date || ''}
+                                    onChange={e => handleInputChange('date', e.target.value)}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="scheduledTime">Waktu *</Label>
+                                <Input
+                                    id="scheduledTime"
+                                    type="time"
+                                    value={formData.scheduledTime || ''}
+                                    onChange={e => handleInputChange('scheduledTime', e.target.value)}
+                                    required
+                                />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+                <div className="flex justify-end mt-6">
+                    <Button type="submit" disabled={isSaving}>{isSaving ? 'Menyimpan...' : <><Save className="mr-2 h-4 w-4" /> Simpan Perubahan</>}</Button>
+                </div>
+            </form>
+        </div>
+    );
+}

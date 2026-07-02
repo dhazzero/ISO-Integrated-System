@@ -1,0 +1,948 @@
+"use client"
+
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+    Settings, Users, Building, Shield, Database, Bell, Lock, Plus, Edit, Trash2, Eye,
+    EyeOff, Download, Upload, RefreshCw, User, Mail, Server, HardDrive, Monitor, Key, Users2
+} from "lucide-react"
+import { useState, useEffect, useMemo } from "react"
+import { useToast } from "@/components/ui/use-toast"
+import { logActivity } from "@/lib/logger"
+import { Approver, Department, SecurityLog, Standard, User as UserType, UserRole } from "@/lib/types"
+import { UserMatrixModal } from "@/components/settings/user-matrix-modal"
+import { AddUserModal } from "@/components/settings/add-user-modal"
+import { EditUserModal } from "@/components/settings/edit-user-modal"
+import { SecurityLogCard } from "@/components/settings/security-log-card"
+import { CompanyManagement } from "@/components/settings/company-management"
+import { APP_VERSION, LICENSE_KEY } from "@/lib/config"
+
+// Tipe data untuk struktur hirarki
+export interface HierarchicalUser extends UserType {
+    subordinates: HierarchicalUser[];
+}
+
+export interface DepartmentNode {
+    department: Department;
+    users: HierarchicalUser[];
+}
+
+
+export default function SettingsPage() {
+    const { toast } = useToast();
+    const [showApiKey, setShowApiKey] = useState(false)
+    const [departments, setDepartments] = useState<Department[]>([]);
+    const [approvers, setApprovers] = useState<Approver[]>([]);
+    const [securityLogs, setSecurityLogs] = useState<SecurityLog[]>([]);
+    const [users, setUsers] = useState<UserType[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isAddDepartmentOpen, setIsAddDepartmentOpen] = useState(false);
+    const [newDepartment, setNewDepartment] = useState({ name: "", head: "" });
+    const [isAddApproverOpen, setIsAddApproverOpen] = useState(false);
+    const [newApprover, setNewApprover] = useState({ title: "", name: "" });
+    const [isEditDepartmentOpen, setIsEditDepartmentOpen] = useState(false);
+    const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
+    const [isEditApproverOpen, setIsEditApproverOpen] = useState(false);
+    const [editingApprover, setEditingApprover] = useState<Approver | null>(null);
+    const [isUserMatrixOpen, setIsUserMatrixOpen] = useState(false);
+    const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+    const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState<UserType | null>(null);
+    const [deleteConfirm, setDeleteConfirm] = useState({
+        open: false, type: null as 'department' | 'approver' | 'user' | null, id: null as string | null, name: null as string | null,
+    });
+    const [dbStats, setDbStats] = useState<any>(null);
+    const [standards, setStandards] = useState<Standard[]>([]);
+    const [isAddStandardOpen, setIsAddStandardOpen] = useState(false);
+    const [isEditStandardOpen, setIsEditStandardOpen] = useState(false);
+    const [editingStandard, setEditingStandard] = useState<Standard | null>(null);
+    const [newStandard, setNewStandard] = useState({ name: "", title: "", description: "", category: "", status: "Active" });
+
+    const [smtpSettings, setSmtpSettings] = useState({
+        smtpHost: "smtp.gmail.com",
+        smtpPort: 587,
+        smtpUser: "",
+        smtpPass: "",
+        fromEmail: "",
+    });
+    const [testEmailRecipient, setTestEmailRecipient] = useState("");
+    const [isTestingEmail, setIsTestingEmail] = useState(false);
+    const [isSavingSmtp, setIsSavingSmtp] = useState(false);
+
+    // OJK PIC State
+    interface OjkPic {
+        _id: string;
+        name: string;
+        email: string;
+        jabatan: string;
+        active: boolean;
+    }
+    const [ojkPics, setOjkPics] = useState<OjkPic[]>([]);
+    const [newPic, setNewPic] = useState({ name: "", email: "", jabatan: "" });
+    const [isAddingPic, setIsAddingPic] = useState(false);
+
+    // Notification Templates State
+    interface NotificationTemplate {
+        id: string;
+        name: string;
+        description: string;
+        status: string;
+        daysBeforeNotify: number;
+        picEmail: string;
+        picName: string;
+    }
+    const [notificationTemplates, setNotificationTemplates] = useState<NotificationTemplate[]>([]);
+    const [isEditTemplateOpen, setIsEditTemplateOpen] = useState(false);
+    const [editingTemplate, setEditingTemplate] = useState<NotificationTemplate | null>(null);
+
+    // System Settings State
+    const [systemSettings, setSystemSettings] = useState({
+        systemName: 'ISO Integrated System',
+        companyName: 'PT. Contoh Indonesia',
+        darkMode: false,
+        compactView: false,
+        sidebarCollapsed: false,
+        language: 'id',
+        timezone: 'Asia/Jakarta',
+        dateFormat: 'dd/mm/yyyy',
+        currency: 'IDR',
+    });
+    const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+    // Organization Settings State
+    const [orgSettings, setOrgSettings] = useState({
+        companyName: 'PT. Contoh Indonesia',
+        companyCode: 'PCI001',
+        taxId: '01.234.567.8-901.000',
+        businessLicense: 'NIB-1234567890123',
+        address: 'Jl. Contoh No. 123, Jakarta Selatan 12345',
+        phone: '+62 21 1234 5678',
+        email: 'info@contoh.co.id',
+        website: 'https://www.contoh.co.id',
+    });
+
+    // Security Settings State
+    const [securitySettings, setSecuritySettings] = useState({
+        minPasswordLength: 8,
+        passwordExpiry: 90,
+        requireUppercase: true,
+        requireNumbers: true,
+        requireSpecialChars: true,
+        sessionTimeout: 30,
+        maxLoginAttempts: 5,
+        autoLogout: true,
+        rateLimitEnabled: true,
+        rateLimit: 100,
+    });
+
+    // Backup State
+    interface BackupRecord {
+        _id?: string;
+        name: string;
+        size: string;
+        date: string | Date;
+        status: string;
+        type?: string;
+    }
+    const [backupHistory, setBackupHistory] = useState<BackupRecord[]>([]);
+    const [backupInProgress, setBackupInProgress] = useState(false);
+    const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+    const [currentCompanyCode, setCurrentCompanyCode] = useState('');
+
+    // Fetch current user info to check if super admin
+    const fetchCurrentUser = async () => {
+        try {
+            const response = await fetch('/api/auth/me');
+            if (response.ok) {
+                const data = await response.json();
+                setIsSuperAdmin(data.user?.isSuperAdmin || false);
+                setCurrentCompanyCode(data.user?.companyCode || '');
+            }
+        } catch (error) {
+            console.error('Failed to fetch current user:', error);
+        }
+    };
+
+    const fetchSmtpSettings = async () => {
+        try {
+            const response = await fetch('/api/notifications/test-email');
+            if (response.ok) {
+                const data = await response.json();
+                setSmtpSettings({
+                    smtpHost: data.smtpHost || 'smtp.gmail.com',
+                    smtpPort: data.smtpPort || 587,
+                    smtpUser: data.smtpUser || '',
+                    smtpPass: data.smtpPass || '',
+                    fromEmail: data.fromEmail || '',
+                });
+                console.log('[SMTP] Settings loaded:', data.configured ? 'From DB' : 'Defaults');
+            }
+        } catch (error) {
+            console.error('Failed to fetch SMTP settings:', error);
+        }
+    };
+
+    const fetchNotificationTemplates = async () => {
+        try {
+            const response = await fetch('/api/notifications/settings');
+            if (response.ok) {
+                const data = await response.json();
+                setNotificationTemplates(data.templates || []);
+            }
+        } catch (error) {
+            console.error('Failed to fetch notification templates:', error);
+        }
+    };
+
+    const handleUpdateTemplate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingTemplate) return;
+        setIsLoading(true);
+        try {
+            const updatedTemplates = notificationTemplates.map(t => t.id === editingTemplate.id ? editingTemplate : t);
+            const currentSettingsRes = await fetch('/api/notifications/settings');
+            const currentSettings = await currentSettingsRes.json();
+            
+            const response = await fetch('/api/notifications/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    templates: updatedTemplates,
+                    globalSettings: currentSettings.globalSettings || {}
+                }),
+            });
+            if (!response.ok) throw new Error('Gagal menyimpan template');
+            setNotificationTemplates(updatedTemplates);
+            setIsEditTemplateOpen(false);
+            toast({ title: 'Sukses', description: 'Template notifikasi berhasil diperbarui.' });
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: (error as Error).message });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const fetchOjkPics = async () => {
+        try {
+            const response = await fetch('/api/notifications/ojk-pic');
+            if (response.ok) {
+                const data = await response.json();
+                setOjkPics(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch OJK PICs:', error);
+        }
+    };
+
+    const handleAddPic = async () => {
+        if (!newPic.name || !newPic.email) {
+            toast({ variant: "destructive", title: "Error", description: "Nama dan email wajib diisi" });
+            return;
+        }
+        setIsAddingPic(true);
+        try {
+            const response = await fetch('/api/notifications/ojk-pic', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newPic),
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                toast({ title: "Sukses ✅", description: data.message });
+                setNewPic({ name: "", email: "", jabatan: "" });
+                await fetchOjkPics();
+            } else {
+                toast({ variant: "destructive", title: "Error", description: data.error || 'Gagal menambah PIC' });
+            }
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: (error as Error).message });
+        } finally {
+            setIsAddingPic(false);
+        }
+    };
+
+    const handleDeletePic = async (id: string, name: string) => {
+        if (!confirm(`Hapus PIC ${name}?`)) return;
+        try {
+            const response = await fetch('/api/notifications/ojk-pic', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id }),
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
+                toast({ title: "Sukses", description: data.message });
+                await fetchOjkPics();
+            } else {
+                toast({ variant: "destructive", title: "Error", description: data.error || 'Gagal menghapus PIC' });
+            }
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: (error as Error).message });
+        }
+    };
+
+    const handleSmtpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { id, value } = e.target;
+        setSmtpSettings(prev => ({ ...prev, [id]: id === 'smtpPort' ? parseInt(value) || 587 : value }));
+    };
+
+    const handleEmailTest = async (action: 'verify' | 'test') => {
+        setIsTestingEmail(true);
+        console.log('[SMTP Test] Starting:', action);
+        console.log('[SMTP Test] Settings:', { ...smtpSettings, smtpPass: smtpSettings.smtpPass ? '***SET***' : '***EMPTY***' });
+        console.log('[SMTP Test] Recipient:', testEmailRecipient);
+        try {
+            const response = await fetch('/api/notifications/test-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action,
+                    recipient: testEmailRecipient,
+                    smtpHost: smtpSettings.smtpHost,
+                    smtpPort: smtpSettings.smtpPort,
+                    smtpUser: smtpSettings.smtpUser,
+                    smtpPass: smtpSettings.smtpPass,
+                    fromEmail: smtpSettings.fromEmail,
+                }),
+            });
+            const data = await response.json();
+            console.log('[SMTP Test] Response:', response.status, data);
+            if (response.ok && data.success) {
+                toast({ title: "Sukses ✅", description: data.message });
+            } else {
+                const errorMsg = data.message || data.error || `HTTP ${response.status}`;
+                console.error('[SMTP Test] FAILED:', errorMsg);
+                toast({ variant: "destructive", title: "Gagal ❌", description: errorMsg });
+            }
+        } catch (error) {
+            console.error('[SMTP Test] ERROR:', error);
+            toast({ variant: "destructive", title: "Error ❌", description: (error as Error).message });
+        } finally {
+            setIsTestingEmail(false);
+        }
+    };
+
+    const handleSaveSmtp = async () => {
+        setIsSavingSmtp(true);
+        console.log('[SMTP Save] Saving settings:', { ...smtpSettings, smtpPass: smtpSettings.smtpPass ? '***SET***' : '***EMPTY***' });
+        try {
+            const response = await fetch('/api/notifications/test-email', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(smtpSettings),
+            });
+            const data = await response.json();
+            console.log('[SMTP Save] Response:', response.status, data);
+            if (response.ok && data.success) {
+                toast({ title: "Sukses ✅", description: data.message || 'Pengaturan SMTP berhasil disimpan.' });
+                await logActivity('UPDATE', 'Notifikasi', 'Memperbarui pengaturan SMTP');
+            } else {
+                const errorMsg = data.message || `Gagal menyimpan (HTTP ${response.status})`;
+                console.error('[SMTP Save] FAILED:', errorMsg);
+                toast({ variant: "destructive", title: "Gagal ❌", description: errorMsg });
+            }
+        } catch (error) {
+            console.error('[SMTP Save] ERROR:', error);
+            toast({ variant: "destructive", title: "Error ❌", description: (error as Error).message });
+        } finally {
+            setIsSavingSmtp(false);
+        }
+    };
+    const fetchData = async () => { setIsLoading(true); try { await Promise.all([fetchDepartments(), fetchApprovers(), fetchSecurityLogs(), fetchStandards(), fetchUsers(), fetchDbStats(), fetchSystemSettings(), fetchOrgSettings(), fetchSecuritySettings(), fetchBackups(), fetchCurrentUser(), fetchSmtpSettings(), fetchOjkPics(), fetchNotificationTemplates()]); } catch (error) { toast({ variant: "destructive", title: "Error", description: "Gagal memuat semua data pengaturan." }); } finally { setIsLoading(false); } };
+    const fetchSystemSettings = async () => {
+        try {
+            const response = await fetch('/api/settings/system-settings');
+            if (!response.ok) throw new Error('Gagal mengambil pengaturan sistem');
+            const data = await response.json();
+            setSystemSettings({
+                systemName: data.systemName || 'ISO Integrated System',
+                companyName: data.companyName || 'PT. Contoh Indonesia',
+                darkMode: data.darkMode || false,
+                compactView: data.compactView || false,
+                sidebarCollapsed: data.sidebarCollapsed || false,
+                language: data.language || 'id',
+                timezone: data.timezone || 'Asia/Jakarta',
+                dateFormat: data.dateFormat || 'dd/mm/yyyy',
+                currency: data.currency || 'IDR',
+            });
+        } catch (error) {
+            console.error('Failed to fetch system settings:', error);
+        }
+    };
+    const fetchOrgSettings = async () => {
+        try {
+            const response = await fetch('/api/settings/organization-settings');
+            if (!response.ok) throw new Error('Gagal mengambil pengaturan organisasi');
+            const data = await response.json();
+            setOrgSettings({
+                companyName: data.companyName || 'PT. Contoh Indonesia',
+                companyCode: data.companyCode || 'PCI001',
+                taxId: data.taxId || '01.234.567.8-901.000',
+                businessLicense: data.businessLicense || 'NIB-1234567890123',
+                address: data.address || 'Jl. Contoh No. 123, Jakarta Selatan 12345',
+                phone: data.phone || '+62 21 1234 5678',
+                email: data.email || 'info@contoh.co.id',
+                website: data.website || 'https://www.contoh.co.id',
+            });
+        } catch (error) {
+            console.error('Failed to fetch organization settings:', error);
+        }
+    };
+    const fetchSecuritySettings = async () => {
+        try {
+            const response = await fetch('/api/settings/security-settings');
+            if (!response.ok) throw new Error('Gagal mengambil pengaturan keamanan');
+            const data = await response.json();
+            setSecuritySettings({
+                minPasswordLength: data.minPasswordLength ?? 8,
+                passwordExpiry: data.passwordExpiry ?? 90,
+                requireUppercase: data.requireUppercase ?? true,
+                requireNumbers: data.requireNumbers ?? true,
+                requireSpecialChars: data.requireSpecialChars ?? true,
+                sessionTimeout: data.sessionTimeout ?? 30,
+                maxLoginAttempts: data.maxLoginAttempts ?? 5,
+                autoLogout: data.autoLogout ?? true,
+                rateLimitEnabled: data.rateLimitEnabled ?? true,
+                rateLimit: data.rateLimit ?? 100,
+            });
+        } catch (error) {
+            console.error('Failed to fetch security settings:', error);
+        }
+    };
+    const fetchDepartments = async () => { try { const response = await fetch('/api/settings/departments'); if (!response.ok) throw new Error('Gagal mengambil data departemen'); setDepartments(await response.json()); } catch (error) { toast({ variant: "destructive", title: "Error Departemen", description: (error as Error).message }); } };
+    const fetchApprovers = async () => { try { const response = await fetch('/api/settings/approvers'); if (!response.ok) throw new Error('Gagal mengambil data approver'); setApprovers(await response.json()); } catch (error) { toast({ variant: "destructive", title: "Error Approver", description: (error as Error).message }); } };
+    const fetchSecurityLogs = async () => { try { const response = await fetch('/api/logs/security'); if (!response.ok) throw new Error('Gagal mengambil data log keamanan'); setSecurityLogs(await response.json()); } catch (error) { toast({ variant: "destructive", title: "Error Log", description: (error as Error).message }); } };
+    const fetchUsers = async () => { try { const response = await fetch('/api/users'); if (!response.ok) throw new Error('Gagal mengambil data pengguna'); setUsers(await response.json()); } catch (error) { toast({ variant: "destructive", title: "Error Pengguna", description: (error as Error).message }); } };
+    const fetchBackups = async () => { try { const response = await fetch('/api/database/backup'); if (!response.ok) throw new Error('Gagal mengambil riwayat backup'); setBackupHistory(await response.json()); } catch (error) { console.error('Failed to fetch backup history:', error); } };
+    const handleBackup = async () => {
+        setBackupInProgress(true);
+        try {
+            const response = await fetch('/api/database/backup', { method: 'POST' });
+            if (!response.ok) throw new Error('Gagal membuat backup');
+            // Download file
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `iso-backup-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            toast({ title: "Backup Berhasil", description: "File backup telah diunduh." });
+            await fetchBackups(); // Refresh backup history
+            await logActivity('CREATE', 'Backup', 'Membuat backup database manual');
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error Backup", description: (error as Error).message });
+        } finally {
+            setBackupInProgress(false);
+        }
+    };
+    const fetchDbStats = async () => { try { const response = await fetch('/api/database/status'); if (!response.ok) throw new Error('Gagal mengambil status DB'); setDbStats(await response.json()); } catch (error) { toast({ variant: "destructive", title: "Error Status DB", description: (error as Error).message }); } };
+
+
+    useEffect(() => { fetchData(); }, []);
+
+    const userMatrixData = useMemo(() => {
+        if (!users.length) return { departmentNodes: [], unassignedUsers: [] };
+        const usersWithSubordinates: HierarchicalUser[] = users.map(u => ({ ...u, subordinates: [] }));
+        const userMap = new Map(usersWithSubordinates.map(u => [u._id.toString(), u]));
+        const topLevelUsers: HierarchicalUser[] = [];
+        usersWithSubordinates.forEach(user => {
+            if (user.supervisorId) {
+                const supervisor = userMap.get(user.supervisorId.toString());
+                if (supervisor) {
+                    supervisor.subordinates.push(user);
+                } else {
+                    topLevelUsers.push(user);
+                }
+            } else {
+                topLevelUsers.push(user);
+            }
+        });
+        const departmentNodes: DepartmentNode[] = departments.map(dept => ({
+            department: dept,
+            users: [],
+        }));
+        const departmentMap = new Map(departmentNodes.map(d => [d.department._id.toString(), d]));
+        const unassignedUsers: HierarchicalUser[] = [];
+        topLevelUsers.forEach(user => {
+            if (user.departmentId) {
+                const departmentNode = departmentMap.get(user.departmentId.toString());
+                if (departmentNode) {
+                    departmentNode.users.push(user);
+                } else {
+                    unassignedUsers.push(user);
+                }
+            } else {
+                unassignedUsers.push(user);
+            }
+        });
+        return { departmentNodes, unassignedUsers };
+    }, [users, departments]);
+
+    const handleEditUserClick = (user: UserType) => {
+        setEditingUser(user);
+        setIsEditUserModalOpen(true);
+    };
+
+    const handleAddDepartment = async (e: React.FormEvent) => { e.preventDefault(); if (!newDepartment.name || !newDepartment.head) return; setIsLoading(true); try { const response = await fetch('/api/settings/departments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newDepartment) }); if (!response.ok) { const err = await response.json(); throw new Error(err.message || 'Gagal'); } await logActivity('CREATE', 'Departemen', `Menambahkan departemen: ${newDepartment.name}`); await fetchData(); setIsAddDepartmentOpen(false); setNewDepartment({ name: "", head: "" }); toast({ title: "Sukses", description: "Departemen baru berhasil ditambahkan." }); } catch (error) { toast({ variant: "destructive", title: "Error", description: (error as Error).message }); } finally { setIsLoading(false); } };
+    const handleAddApprover = async (e: React.FormEvent) => { e.preventDefault(); if (!newApprover.title || !newApprover.name) return; setIsLoading(true); try { const response = await fetch('/api/settings/approvers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newApprover) }); if (!response.ok) { const err = await response.json(); throw new Error(err.message); } await logActivity('CREATE', 'Approval', `Menambahkan jabatan <span class="math-inline">\{newApprover\.title\} \(</span>{newApprover.name})`); await fetchData(); setIsAddApproverOpen(false); setNewApprover({ title: "", name: "" }); toast({ title: "Sukses", description: "Jabatan approval berhasil ditambahkan." }); } catch (error) { toast({ variant: "destructive", title: "Error", description: (error as Error).message }); } finally { setIsLoading(false); } };
+    const handleEditDepartmentClick = (department: Department) => { setEditingDepartment(JSON.parse(JSON.stringify(department))); setIsEditDepartmentOpen(true); };
+    const handleEditApproverClick = (approver: Approver) => { setEditingApprover(JSON.parse(JSON.stringify(approver))); setIsEditApproverOpen(true); };
+    const handleUpdateDepartment = async (e: React.FormEvent) => { e.preventDefault(); if (!editingDepartment?._id) return; setIsLoading(true); try { const response = await fetch(`/api/settings/departments/${editingDepartment._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editingDepartment.name, head: editingDepartment.head }), }); if (!response.ok) { const err = await response.json(); throw new Error(err.message); } await logActivity('UPDATE', 'Departemen', `Memperbarui departemen: ${editingDepartment.name}`); await fetchData(); setIsEditDepartmentOpen(false); toast({ title: "Sukses", description: "Departemen berhasil diperbarui." }); } catch (error) { toast({ variant: "destructive", title: "Error", description: (error as Error).message }); } finally { setIsLoading(false); } };
+    const handleUpdateApprover = async (e: React.FormEvent) => { e.preventDefault(); if (!editingApprover?._id) return; setIsLoading(true); try { const response = await fetch(`/api/settings/approvers/${editingApprover._id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: editingApprover.title, name: editingApprover.name }), }); if (!response.ok) { const err = await response.json(); throw new Error(err.message); } await logActivity('UPDATE', 'Approval', `Memperbarui jabatan: ${editingApprover.title}`); await fetchData(); setIsEditApproverOpen(false); toast({ title: "Sukses", description: "Jabatan approval berhasil diperbarui." }); } catch (error) { toast({ variant: "destructive", title: "Error", description: (error as Error).message }); } finally { setIsLoading(false); } };
+    const handleUpdateStandard = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingStandard?._id) return;
+        setIsLoading(true);
+        try {
+            const response = await fetch(`/api/settings/standards/${editingStandard._id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(editingStandard),
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.message || 'Gagal memperbarui standar');
+            }
+            await logActivity('UPDATE', 'Standar ISO', `Memperbarui standar: ${editingStandard.name}`);
+            await fetchData();
+            setIsEditStandardOpen(false);
+            toast({ title: "Sukses", description: "Standar berhasil diperbarui." });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: (error as Error).message });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    const handleDeleteClick = (type: 'department' | 'approver' | 'standard' | 'user', item: { _id?: string, name?: string, title?: string }) => {
+        setDeleteConfirm({
+            open: true,
+            type: type as any,
+            id: item._id || null,
+            name: item.name || item.title || null,
+        });
+    };
+    const fetchStandards = async () => {
+        try {
+            const response = await fetch('/api/settings/standards');
+            if (!response.ok) throw new Error('Gagal mengambil data standar');
+            setStandards(await response.json());
+        } catch (error) { toast({ variant: "destructive", title: "Error Standar", description: (error as Error).message }); }
+    };
+
+    const handleAddStandard = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newStandard.name || !newStandard.title) return;
+        setIsLoading(true);
+        try {
+            const response = await fetch('/api/settings/standards', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newStandard) });
+            if (!response.ok) { const err = await response.json(); throw new Error(err.message || 'Gagal'); }
+            await logActivity('CREATE', 'Standar ISO', `Menambahkan standar: ${newStandard.name}`);
+            await fetchData();
+            setIsAddStandardOpen(false);
+            setNewStandard({ name: "", title: "", description: "", category: "", status: "Active" });
+            toast({ title: "Sukses", description: "Standar baru berhasil ditambahkan." });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: (error as Error).message });
+        } finally { setIsLoading(false); }
+    };
+
+    const handleEditStandardClick = (standard: Standard) => {
+        setEditingStandard(JSON.parse(JSON.stringify(standard)));
+        setIsEditStandardOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteConfirm.id || !deleteConfirm.type) return;
+        setIsLoading(true);
+        try {
+            const url = deleteConfirm.type === 'user' ? `/api/users/${deleteConfirm.id}` : `/api/settings/${deleteConfirm.type}s/${deleteConfirm.id}`;
+            const response = await fetch(url, { method: 'DELETE' });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.message || `Gagal menghapus ${deleteConfirm.type}.`);
+            }
+            await logActivity('DELETE', deleteConfirm.type.charAt(0).toUpperCase() + deleteConfirm.type.slice(1), `Menghapus ${deleteConfirm.type}: ${deleteConfirm.name}`);
+            await fetchData();
+            toast({ title: "Berhasil!", description: `${deleteConfirm.name} berhasil dihapus.` });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error Hapus!", description: (error as Error).message });
+        } finally {
+            setIsLoading(false);
+            setDeleteConfirm({ open: false, type: null, id: null, name: null });
+        }
+    };
+
+    const handleSaveSystemSettings = async () => {
+        setIsSavingSettings(true);
+        try {
+            // Save all settings in parallel
+            const [sysRes, orgRes, secRes] = await Promise.all([
+                fetch('/api/settings/system-settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(systemSettings),
+                }),
+                fetch('/api/settings/organization-settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(orgSettings),
+                }),
+                fetch('/api/settings/security-settings', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(securitySettings),
+                }),
+            ]);
+
+            if (!sysRes.ok || !orgRes.ok || !secRes.ok) {
+                throw new Error('Gagal menyimpan beberapa pengaturan');
+            }
+
+            await logActivity('UPDATE', 'Pengaturan', 'Memperbarui pengaturan sistem, organisasi, dan keamanan');
+            toast({ title: "Sukses", description: "Semua pengaturan berhasil disimpan." });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: (error as Error).message });
+        } finally {
+            setIsSavingSettings(false);
+        }
+    };
+
+    const handleResetSettings = () => {
+        setSystemSettings({
+            systemName: 'ISO Integrated System',
+            companyName: 'PT. Contoh Indonesia',
+            darkMode: false,
+            compactView: false,
+            sidebarCollapsed: false,
+            language: 'id',
+            timezone: 'Asia/Jakarta',
+            dateFormat: 'dd/mm/yyyy',
+            currency: 'IDR',
+        });
+        toast({ title: "Info", description: "Pengaturan direset ke default. Klik 'Simpan Perubahan' untuk menyimpan." });
+    };
+
+    return (
+        <div className="container mx-auto px-4 py-6">
+            <div className="flex justify-between items-center mb-6"><h1 className="text-3xl font-bold">Pengaturan Sistem</h1><div className="flex space-x-2"><Button variant="outline" onClick={handleResetSettings}>Reset ke Default</Button><Button onClick={handleSaveSystemSettings} disabled={isSavingSettings}>{isSavingSettings ? 'Menyimpan...' : 'Simpan Perubahan'}</Button></div></div>
+            <Tabs defaultValue="general" className="w-full">
+                <div className="flex flex-col md:flex-row gap-6">
+                    <div className="md:w-1/4">
+                        <TabsList className="flex flex-col h-auto p-0 bg-transparent space-y-1">
+                            <TabsTrigger value="general" className="justify-start px-4 py-2 h-10 data-[state=active]:bg-muted"><Settings className="mr-2 h-4 w-4" />Umum</TabsTrigger>
+                            <TabsTrigger value="users" className="justify-start px-4 py-2 h-10 data-[state=active]:bg-muted"><Users className="mr-2 h-4 w-4" />Pengguna</TabsTrigger>
+                            <TabsTrigger value="organization" className="justify-start px-4 py-2 h-10 data-[state=active]:bg-muted"><Building className="mr-2 h-4 w-4" />Organisasi</TabsTrigger>
+                            <TabsTrigger value="security" className="justify-start px-4 py-2 h-10 data-[state=active]:bg-muted"><Shield className="mr-2 h-4 w-4" />Keamanan</TabsTrigger>
+                            <TabsTrigger value="database" className="justify-start px-4 py-2 h-10 data-[state=active]:bg-muted"><Database className="mr-2 h-4 w-4" />Basis Data</TabsTrigger>
+                            <TabsTrigger value="notifications" className="justify-start px-4 py-2 h-10 data-[state=active]:bg-muted"><Bell className="mr-2 h-4 w-4" />Notifikasi</TabsTrigger>
+                            <TabsTrigger value="migration" className="justify-start px-4 py-2 h-10 data-[state=active]:bg-muted"><Upload className="mr-2 h-4 w-4" />Migrasi Data</TabsTrigger>
+                            {isSuperAdmin && (
+                                <TabsTrigger value="companies" className="justify-start px-4 py-2 h-10 data-[state=active]:bg-muted border-t pt-3 mt-2 text-primary"><Building className="mr-2 h-4 w-4" />Perusahaan</TabsTrigger>
+                            )}
+                        </TabsList>
+                    </div>
+                    <div className="md:w-3/4">
+                        <TabsContent value="general"><div className="space-y-6"><Card><CardHeader><CardTitle>Informasi Sistem</CardTitle><CardDescription>Kelola pengaturan umum sistem</CardDescription></CardHeader><CardContent className="space-y-6"><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="system-name">Nama Sistem</Label><Input id="system-name" value={systemSettings.systemName} onChange={(e) => setSystemSettings(prev => ({ ...prev, systemName: e.target.value }))} /></div><div className="space-y-2"><Label htmlFor="system-version">Versi</Label><div className="relative"><Input id="system-version" value={APP_VERSION} readOnly className="bg-muted pr-10" /><Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" /></div></div><div className="space-y-2"><Label htmlFor="company-name">Nama Perusahaan</Label><Input id="company-name" value={systemSettings.companyName} onChange={(e) => setSystemSettings(prev => ({ ...prev, companyName: e.target.value }))} /></div><div className="space-y-2"><Label htmlFor="license-key">License Key</Label><div className="relative"><Input id="license-key" value={LICENSE_KEY} readOnly className="bg-muted pr-10" /><Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" /></div></div></div><Separator /><div className="space-y-4"><h3 className="text-lg font-medium">Preferensi Tampilan</h3><div className="space-y-4"><div className="flex items-center justify-between"><div className="space-y-0.5"><Label htmlFor="dark-mode">Mode Gelap</Label><p className="text-sm text-muted-foreground">Aktifkan mode gelap secara default</p></div><Switch id="dark-mode" checked={systemSettings.darkMode} onCheckedChange={(checked) => setSystemSettings(prev => ({ ...prev, darkMode: checked }))} /></div><div className="flex items-center justify-between"><div className="space-y-0.5"><Label htmlFor="compact-view">Tampilan Kompak</Label><p className="text-sm text-muted-foreground">Gunakan tampilan yang lebih kompak</p></div><Switch id="compact-view" checked={systemSettings.compactView} onCheckedChange={(checked) => setSystemSettings(prev => ({ ...prev, compactView: checked }))} /></div><div className="flex items-center justify-between"><div className="space-y-0.5"><Label htmlFor="sidebar-collapsed">Sidebar Tertutup</Label><p className="text-sm text-muted-foreground">Sidebar tertutup secara default</p></div><Switch id="sidebar-collapsed" checked={systemSettings.sidebarCollapsed} onCheckedChange={(checked) => setSystemSettings(prev => ({ ...prev, sidebarCollapsed: checked }))} /></div></div></div><Separator /><div className="space-y-4"><h3 className="text-lg font-medium">Bahasa & Wilayah</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="language">Bahasa</Label><select id="language" className="w-full p-2 rounded-md border border-input bg-background" value={systemSettings.language} onChange={(e) => setSystemSettings(prev => ({ ...prev, language: e.target.value }))}><option value="id">Bahasa Indonesia</option><option value="en">English</option></select></div><div className="space-y-2"><Label htmlFor="timezone">Zona Waktu</Label><select id="timezone" className="w-full p-2 rounded-md border border-input bg-background" value={systemSettings.timezone} onChange={(e) => setSystemSettings(prev => ({ ...prev, timezone: e.target.value }))}><option value="Asia/Jakarta">Asia/Jakarta (GMT+7)</option><option value="Asia/Makassar">Asia/Makassar (GMT+8)</option><option value="Asia/Jayapura">Asia/Jayapura (GMT+9)</option></select></div><div className="space-y-2"><Label htmlFor="date-format">Format Tanggal</Label><select id="date-format" className="w-full p-2 rounded-md border border-input bg-background" value={systemSettings.dateFormat} onChange={(e) => setSystemSettings(prev => ({ ...prev, dateFormat: e.target.value }))}><option value="dd/mm/yyyy">DD/MM/YYYY</option><option value="mm/dd/yyyy">MM/DD/YYYY</option><option value="yyyy-mm-dd">YYYY-MM-DD</option></select></div><div className="space-y-2"><Label htmlFor="currency">Mata Uang</Label><select id="currency" className="w-full p-2 rounded-md border border-input bg-background" value={systemSettings.currency} onChange={(e) => setSystemSettings(prev => ({ ...prev, currency: e.target.value }))}><option value="IDR">Rupiah (IDR)</option><option value="USD">US Dollar (USD)</option><option value="EUR">Euro (EUR)</option></select></div></div></div></CardContent></Card></div></TabsContent>
+                        <TabsContent value="users"><div className="space-y-6"><Card><CardHeader><div className="flex justify-between items-center"><div><CardTitle>Manajemen Pengguna</CardTitle><CardDescription>Kelola pengguna dan hak akses sistem</CardDescription></div><div className="flex space-x-2"><Button variant="outline" onClick={() => setIsUserMatrixOpen(true)}><Users2 className="mr-2 h-4 w-4" />Lihat Matriks</Button><Button onClick={() => setIsAddUserModalOpen(true)}><Plus className="mr-2 h-4 w-4" />Tambah Pengguna</Button></div></div></CardHeader><CardContent><div className="space-y-4"><div className="flex justify-between items-center"><Input placeholder="Cari pengguna..." className="max-w-sm" /><div className="flex space-x-2"><Button variant="outline" size="sm"><Download className="mr-2 h-4 w-4" />Export</Button><Button variant="outline" size="sm"><Upload className="mr-2 h-4 w-4" />Import</Button></div></div><div className="border rounded-lg"><div className="overflow-x-auto"><table className="w-full"><thead className="border-b bg-muted/50"><tr><th className="text-left p-4">Pengguna</th><th className="text-left p-4">Role</th><th className="text-left p-4">Status</th><th className="text-left p-4">Login Terakhir</th><th className="text-left p-4">Aksi</th></tr></thead><tbody>
+                            {users.length > 0 ? (
+                                users.map((user) => (
+                                    <tr key={user._id.toString()} className="border-b">
+                                        <td className="p-4">
+                                            <div className="flex items-center space-x-3">
+                                                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center"><User className="h-4 w-4" /></div>
+                                                <div>
+                                                    <div className="font-medium">{user.name}</div>
+                                                    <div className="text-sm text-muted-foreground">{user.email}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="p-4"><Badge variant={user.role === "administrator" ? "default" : "secondary"}>{user.role}</Badge></td>
+                                        <td className="p-4"><Badge variant={user.status === "active" ? "default" : "secondary"}>{user.status}</Badge></td>
+                                        <td className="p-4 text-sm text-muted-foreground">{user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'N/A'}</td>
+                                        <td className="p-4">
+                                            <div className="flex space-x-2">
+                                                <Button variant="ghost" size="sm" onClick={() => handleEditUserClick(user)}><Edit className="h-4 w-4" /></Button>
+                                                <Button variant="ghost" size="sm" onClick={() => handleDeleteClick('user', user)}><Trash2 className="h-4 w-4" /></Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr><td colSpan={5} className="text-center p-8 text-muted-foreground">{isLoading ? "Memuat data pengguna..." : "Tidak ada data pengguna."}</td></tr>
+                            )}
+                        </tbody></table></div></div></div></CardContent></Card><Card><CardHeader><CardTitle>Pengaturan Pengguna</CardTitle></CardHeader><CardContent className="space-y-4"><div className="flex items-center justify-between"><div className="space-y-0.5"><Label>Registrasi Mandiri</Label><p className="text-sm text-muted-foreground">Izinkan pengguna mendaftar sendiri</p></div><Switch /></div><div className="flex items-center justify-between"><div className="space-y-0.5"><Label>Verifikasi Email</Label><p className="text-sm text-muted-foreground">Wajibkan verifikasi email untuk akun baru</p></div><Switch defaultChecked /></div><div className="flex items-center justify-between"><div className="space-y-0.5"><Label>Two-Factor Authentication</Label><p className="text-sm text-muted-foreground">Wajibkan 2FA untuk semua pengguna</p></div><Switch /></div></CardContent></Card></div></TabsContent>
+
+                        <TabsContent value="organization">
+                            <div className="space-y-6">
+                                <Card><CardHeader><CardTitle>Informasi Organisasi</CardTitle><CardDescription>Kelola informasi perusahaan dan struktur organisasi</CardDescription></CardHeader><CardContent className="space-y-6"><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="company-name-org">Nama Perusahaan</Label><Input id="company-name-org" value={orgSettings.companyName} onChange={(e) => setOrgSettings(prev => ({ ...prev, companyName: e.target.value }))} /></div><div className="space-y-2"><Label htmlFor="company-code">Kode Perusahaan</Label><Input id="company-code" value={orgSettings.companyCode} onChange={(e) => setOrgSettings(prev => ({ ...prev, companyCode: e.target.value }))} /></div><div className="space-y-2"><Label htmlFor="tax-id">NPWP</Label><Input id="tax-id" value={orgSettings.taxId} onChange={(e) => setOrgSettings(prev => ({ ...prev, taxId: e.target.value }))} /></div><div className="space-y-2"><Label htmlFor="business-license">Nomor Izin Usaha</Label><Input id="business-license" value={orgSettings.businessLicense} onChange={(e) => setOrgSettings(prev => ({ ...prev, businessLicense: e.target.value }))} /></div></div><div className="space-y-2"><Label htmlFor="company-address">Alamat Perusahaan</Label><Textarea id="company-address" value={orgSettings.address} onChange={(e) => setOrgSettings(prev => ({ ...prev, address: e.target.value }))} /></div><div className="grid grid-cols-1 md:grid-cols-3 gap-4"><div className="space-y-2"><Label htmlFor="phone">Telepon</Label><Input id="phone" value={orgSettings.phone} onChange={(e) => setOrgSettings(prev => ({ ...prev, phone: e.target.value }))} /></div><div className="space-y-2"><Label htmlFor="email-org">Email</Label><Input id="email-org" value={orgSettings.email} onChange={(e) => setOrgSettings(prev => ({ ...prev, email: e.target.value }))} /></div><div className="space-y-2"><Label htmlFor="website">Website</Label><Input id="website" value={orgSettings.website} onChange={(e) => setOrgSettings(prev => ({ ...prev, website: e.target.value }))} /></div></div></CardContent></Card>
+                                <Card>
+                                    <CardHeader><div className="flex justify-between items-center"><div><CardTitle>Departemen</CardTitle><CardDescription>Kelola struktur departemen organisasi</CardDescription></div><Dialog open={isAddDepartmentOpen} onOpenChange={setIsAddDepartmentOpen}><DialogTrigger asChild><Button onClick={() => setNewDepartment({ name: "", head: "" })}><Plus className="mr-2 h-4 w-4" />Tambah Departemen</Button></DialogTrigger><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>Tambah Departemen Baru</DialogTitle></DialogHeader><form onSubmit={handleAddDepartment} className="space-y-4 py-4"><div className="space-y-2"><Label htmlFor="dept-name">Nama Departemen</Label><Input id="dept-name" value={newDepartment.name} onChange={(e) => setNewDepartment(prev => ({ ...prev, name: e.target.value }))} placeholder="Contoh: Quality Assurance" required /></div><div className="space-y-2"><Label htmlFor="dept-head">Kepala Departemen</Label><Input id="dept-head" value={newDepartment.head} onChange={(e) => setNewDepartment(prev => ({ ...prev, head: e.target.value }))} placeholder="Contoh: John Doe" required /></div><DialogFooter><Button type="button" variant="outline" onClick={() => setIsAddDepartmentOpen(false)}>Batal</Button><Button type="submit" disabled={isLoading}>{isLoading ? 'Menyimpan...' : 'Simpan'}</Button></DialogFooter></form></DialogContent></Dialog></div></CardHeader>
+                                    <CardContent><div className="border rounded-lg"><table className="w-full text-sm"><thead className="border-b bg-muted/50"><tr><th className="text-left p-4">Departemen</th><th className="text-left p-4">Kepala</th><th className="text-right p-4">Aksi</th></tr></thead><tbody>{departments.map((dept) => (<tr key={dept._id} className="border-b"><td className="p-4 font-medium">{dept.name}</td><td className="p-4 text-muted-foreground">{dept.head}</td><td className="p-4 text-right"><div className="flex justify-end"><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditDepartmentClick(dept)}><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteClick('department', dept)}><Trash2 className="h-4 w-4 text-red-500" /></Button></div></td></tr>))}</tbody></table></div></CardContent>
+                                </Card>
+                                <Card>
+                                    <CardHeader><div className="flex justify-between items-center"><div><CardTitle>Manajemen Approval</CardTitle><CardDescription>Kelola jabatan dan nama penanggung jawab persetujuan.</CardDescription></div><Dialog open={isAddApproverOpen} onOpenChange={setIsAddApproverOpen}><DialogTrigger asChild><Button onClick={() => setNewApprover({ title: "", name: "" })}><Plus className="mr-2 h-4 w-4" />Tambah Approval</Button></DialogTrigger><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>Tambah Jabatan Approval</DialogTitle></DialogHeader><form onSubmit={handleAddApprover} className="space-y-4 py-4"><div className="space-y-2"><Label htmlFor="approverTitle">Nama Jabatan</Label><Input id="approverTitle" value={newApprover.title} onChange={(e) => setNewApprover(prev => ({ ...prev, title: e.target.value }))} placeholder="Contoh: Direktur Utama" required /></div><div className="space-y-2"><Label htmlFor="approverName">Nama Penanggung Jawab</Label><Input id="approverName" value={newApprover.name} onChange={(e) => setNewApprover(prev => ({ ...prev, name: e.target.value }))} placeholder="Contoh: Budi Santoso" required /></div><DialogFooter><Button type="button" variant="outline" onClick={() => setIsAddApproverOpen(false)}>Batal</Button><Button type="submit" disabled={isLoading}>{isLoading ? 'Menyimpan...' : 'Simpan'}</Button></DialogFooter></form></DialogContent></Dialog></div></CardHeader>
+                                    <CardContent><div className="border rounded-lg"><table className="w-full"><thead className="border-b bg-muted/50"><tr><th className="text-left p-4">Jabatan</th><th className="text-left p-4">Nama Penanggung Jawab</th><th className="text-right p-4">Aksi</th></tr></thead><tbody>{approvers.map((approver) => (<tr key={approver._id} className="border-b"><td className="p-4"><div className="flex items-center space-x-3"><Key className="h-4 w-4 text-muted-foreground" /><span className="font-medium">{approver.title}</span></div></td><td className="p-4 text-muted-foreground">{approver.name}</td><td className="p-4 text-right"><div className="flex justify-end"><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditApproverClick(approver)}><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteClick('approver', approver)}><Trash2 className="h-4 w-4 text-red-500" /></Button></div></td></tr>))}</tbody></table></div></CardContent>
+                                </Card>
+                                <Card>
+                                    <CardHeader>
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <CardTitle>Standard</CardTitle>
+                                                <CardDescription>Kelola standard yang diterapkan dalam organisasi.</CardDescription>
+                                            </div>
+                                            <Dialog open={isAddStandardOpen} onOpenChange={setIsAddStandardOpen}>
+                                                <DialogTrigger asChild>
+                                                    <Button onClick={() => setNewStandard({ name: "", title: "", description: "", category: "", status: "Active" })}>
+                                                        <Plus className="mr-2 h-4 w-4" />Tambah Standar
+                                                    </Button>
+                                                </DialogTrigger>
+                                                <DialogContent className="sm:max-w-lg">
+                                                    <DialogHeader><DialogTitle>Tambah Standar Baru</DialogTitle></DialogHeader>
+                                                    <form onSubmit={handleAddStandard} className="space-y-4 py-4">
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div className="space-y-2"><Label htmlFor="std-name">Nama Standard (e.g., ISO 9001:2015)</Label><Input id="std-name" value={newStandard.name} onChange={(e) => setNewStandard(prev => ({ ...prev, name: e.target.value }))} required /></div>
+                                                            <div className="space-y-2"><Label htmlFor="std-title">Judul Standard</Label><Input id="std-title" value={newStandard.title} onChange={(e) => setNewStandard(prev => ({ ...prev, title: e.target.value }))} placeholder="Sistem Manajemen Mutu" required /></div>
+                                                        </div>
+                                                        <div className="space-y-2"><Label htmlFor="std-desc">Deskripsi</Label><Textarea id="std-desc" value={newStandard.description} onChange={(e) => setNewStandard(prev => ({ ...prev, description: e.target.value }))} /></div>
+                                                        <DialogFooter><Button type="button" variant="outline" onClick={() => setIsAddStandardOpen(false)}>Batal</Button><Button type="submit" disabled={isLoading}>{isLoading ? 'Menyimpan...' : 'Simpan'}</Button></DialogFooter>
+                                                    </form>
+                                                </DialogContent>
+                                            </Dialog>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="border rounded-lg">
+                                            <table className="w-full text-sm">
+                                                <thead className="border-b bg-muted/50"><tr><th className="text-left p-4">Nama Standar</th><th className="text-left p-4">Judul</th><th className="text-right p-4">Aksi</th></tr></thead>
+                                                <tbody>
+                                                    {standards.map((std) => (
+                                                        <tr key={std._id} className="border-b">
+                                                            <td className="p-4 font-medium">{std.name}</td>
+                                                            <td className="p-4 text-muted-foreground">{std.title}</td>
+                                                            <td className="p-4 text-right">
+                                                                <div className="flex justify-end">
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditStandardClick(std)}><Edit className="h-4 w-4" /></Button>
+                                                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteClick('standard', std)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </TabsContent>
+                        <TabsContent value="security"><div className="space-y-6"><Card><CardHeader><CardTitle>Kebijakan Keamanan</CardTitle><CardDescription>Kelola pengaturan keamanan sistem</CardDescription></CardHeader><CardContent className="space-y-6"><div className="space-y-4"><h3 className="text-lg font-medium">Kebijakan Password</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="min-password">Panjang Minimum Password</Label><Input id="min-password" type="number" value={securitySettings.minPasswordLength} onChange={(e) => setSecuritySettings(prev => ({ ...prev, minPasswordLength: parseInt(e.target.value) || 8 }))} /></div><div className="space-y-2"><Label htmlFor="password-expiry">Masa Berlaku Password (hari)</Label><Input id="password-expiry" type="number" value={securitySettings.passwordExpiry} onChange={(e) => setSecuritySettings(prev => ({ ...prev, passwordExpiry: parseInt(e.target.value) || 90 }))} /></div></div><div className="space-y-4"><div className="flex items-center justify-between"><div className="space-y-0.5"><Label>Wajib Huruf Besar</Label><p className="text-sm text-muted-foreground">Password harus mengandung huruf besar</p></div><Switch checked={securitySettings.requireUppercase} onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, requireUppercase: checked }))} /></div><div className="flex items-center justify-between"><div className="space-y-0.5"><Label>Wajib Angka</Label><p className="text-sm text-muted-foreground">Password harus mengandung angka</p></div><Switch checked={securitySettings.requireNumbers} onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, requireNumbers: checked }))} /></div><div className="flex items-center justify-between"><div className="space-y-0.5"><Label>Wajib Karakter Khusus</Label><p className="text-sm text-muted-foreground">Password harus mengandung karakter khusus</p></div><Switch checked={securitySettings.requireSpecialChars} onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, requireSpecialChars: checked }))} /></div></div></div><Separator /><div className="space-y-4"><h3 className="text-lg font-medium">Pengaturan Session</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="session-timeout">Session Timeout (menit)</Label><Input id="session-timeout" type="number" value={securitySettings.sessionTimeout} onChange={(e) => setSecuritySettings(prev => ({ ...prev, sessionTimeout: parseInt(e.target.value) || 30 }))} /></div><div className="space-y-2"><Label htmlFor="max-login-attempts">Maksimal Percobaan Login</Label><Input id="max-login-attempts" type="number" value={securitySettings.maxLoginAttempts} onChange={(e) => setSecuritySettings(prev => ({ ...prev, maxLoginAttempts: parseInt(e.target.value) || 5 }))} /></div></div><div className="flex items-center justify-between"><div className="space-y-0.5"><Label>Logout Otomatis</Label><p className="text-sm text-muted-foreground">Logout otomatis saat tidak aktif</p></div><Switch checked={securitySettings.autoLogout} onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, autoLogout: checked }))} /></div></div><Separator /><div className="space-y-4"><h3 className="text-lg font-medium">API Security</h3><div className="space-y-4"><div className="space-y-2"><Label htmlFor="api-key">API Key</Label><div className="flex space-x-2"><Input id="api-key" type={showApiKey ? "text" : "password"} defaultValue="sk-1234567890abcdef1234567890abcdef" readOnly /><Button variant="outline" size="sm" onClick={() => setShowApiKey(!showApiKey)}>{showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button><Button variant="outline" size="sm"><RefreshCw className="h-4 w-4" /></Button></div></div><div className="flex items-center justify-between"><div className="space-y-0.5"><Label>Rate Limiting</Label><p className="text-sm text-muted-foreground">Batasi jumlah request per menit</p></div><Switch checked={securitySettings.rateLimitEnabled} onCheckedChange={(checked) => setSecuritySettings(prev => ({ ...prev, rateLimitEnabled: checked }))} /></div><div className="space-y-2"><Label htmlFor="rate-limit">Rate Limit (request/menit)</Label><Input id="rate-limit" type="number" value={securitySettings.rateLimit} onChange={(e) => setSecuritySettings(prev => ({ ...prev, rateLimit: parseInt(e.target.value) || 100 }))} /></div></div></div></CardContent></Card><SecurityLogCard logs={securityLogs} isLoading={isLoading} onRefresh={fetchSecurityLogs} /></div></TabsContent>
+                        <TabsContent value="database"><div className="space-y-6">
+                            <Card>
+                                <CardHeader><CardTitle>Status Database</CardTitle><CardDescription>Monitor status dan performa database</CardDescription></CardHeader>
+                                <CardContent>
+                                    {isLoading && !dbStats && <p>Memuat status database...</p>}
+                                    {dbStats && (
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div className="p-4 border rounded-lg">
+                                                <div className="flex items-center space-x-2 mb-2"><Server className={`h-5 w-5 ${dbStats.isConnected ? 'text-green-500' : 'text-red-500'}`} /><span className="font-medium">Status Koneksi</span></div>
+                                                <div className={`text-2xl font-bold ${dbStats.isConnected ? 'text-green-500' : 'text-red-500'}`}>{dbStats.isConnected ? 'Online' : 'Offline'}</div>
+                                                <div className="text-sm text-muted-foreground">Database: {dbStats.dbName}</div>
+                                            </div>
+                                            <div className="p-4 border rounded-lg">
+                                                <div className="flex items-center space-x-2 mb-2"><HardDrive className="h-5 w-5 text-blue-500" /><span className="font-medium">Penggunaan Storage</span></div>
+                                                <div className="text-2xl font-bold">{(dbStats.storageSize / 1024 / 1024).toFixed(2)} MB</div>
+                                                <div className="text-sm text-muted-foreground">{dbStats.collections} koleksi, {dbStats.objects} dokumen</div>
+                                            </div>
+                                            <div className="p-4 border rounded-lg">
+                                                <div className="flex items-center space-x-2 mb-2"><Monitor className="h-5 w-5 text-purple-500" /><span className="font-medium">Rata-rata Ukuran Dokumen</span></div>
+                                                <div className="text-2xl font-bold">{(dbStats.avgObjSize / 1024).toFixed(2)} KB</div>
+                                                <div className="text-sm text-muted-foreground">{dbStats.indexes} indeks</div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                            <Card><CardHeader><CardTitle>Backup & Restore</CardTitle><CardDescription>Kelola backup dan restore database</CardDescription></CardHeader><CardContent className="space-y-6"><div className="flex items-center justify-between p-4 border rounded-lg"><div><div className="font-medium">Backup Otomatis</div><div className="text-sm text-muted-foreground">Backup harian pada pukul 02:00 WIB</div></div><Switch defaultChecked /></div><div className="space-y-4"><div className="flex justify-between items-center"><h3 className="text-lg font-medium">Backup Manual</h3><Button onClick={handleBackup} disabled={backupInProgress}>{backupInProgress ? (<><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Memproses...</>) : (<><Download className="mr-2 h-4 w-4" />Buat Backup</>)}</Button></div><div className="space-y-3">{backupHistory.length === 0 && !isLoading && (<p className="text-sm text-center text-muted-foreground py-4">Belum ada riwayat backup.</p>)}{backupHistory.map((backup, index) => (<div key={backup._id || index} className="flex items-center justify-between p-3 border rounded-lg"><div className="flex items-center space-x-3"><Database className="h-5 w-5 text-blue-500" /><div><div className="font-medium">{backup.name}</div><div className="text-sm text-muted-foreground">{backup.size} • {new Date(backup.date).toLocaleString('id-ID')}</div></div></div><div className="flex items-center space-x-2"><Badge variant={backup.status === "Berhasil" ? "default" : "destructive"}>{backup.status}</Badge><Button variant="ghost" size="sm"><Download className="h-4 w-4" /></Button></div></div>))}</div></div></CardContent></Card><Card><CardHeader><CardTitle>Pengaturan Database</CardTitle></CardHeader><CardContent className="space-y-4"><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="db-host">Database Host</Label><div className="relative"><Input id="db-host" value={dbStats?.dbName ? 'MongoDB Atlas' : 'localhost'} readOnly className="bg-muted pr-10" /><Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" /></div></div><div className="space-y-2"><Label htmlFor="db-port">Port</Label><div className="relative"><Input id="db-port" defaultValue="27017" readOnly className="bg-muted pr-10" /><Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" /></div></div><div className="space-y-2"><Label htmlFor="db-name">Database Name</Label><div className="relative"><Input id="db-name" value={dbStats?.dbName || 'isoIntegratedSystemDB'} readOnly className="bg-muted pr-10" /><Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" /></div></div><div className="space-y-2"><Label htmlFor="db-user">Connection Status</Label><div className="relative"><Input id="db-user" value={dbStats?.isConnected ? 'Terhubung' : 'Tidak Terhubung'} readOnly className="bg-muted pr-10" /><Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-50" /></div></div></div><div className="space-y-4"><div className="flex items-center justify-between"><div className="space-y-0.5"><Label>SSL Connection</Label><p className="text-sm text-muted-foreground">Gunakan koneksi SSL untuk keamanan</p></div><Switch defaultChecked /></div><div className="flex items-center justify-between"><div className="space-y-0.5"><Label>Connection Pooling</Label><p className="text-sm text-muted-foreground">Aktifkan connection pooling</p></div><Switch defaultChecked /></div></div></CardContent></Card></div></TabsContent>
+                        <TabsContent value="notifications"><div className="space-y-6"><Card><CardHeader><CardTitle>Pengaturan Email</CardTitle><CardDescription>Konfigurasi server email untuk notifikasi. <strong>Simpan pengaturan SMTP terlebih dahulu sebelum mengirim email.</strong></CardDescription></CardHeader><CardContent className="space-y-6"><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="smtpHost">SMTP Host</Label><Input id="smtpHost" value={smtpSettings.smtpHost} onChange={handleSmtpChange} /></div><div className="space-y-2"><Label htmlFor="smtpPort">SMTP Port</Label><Input id="smtpPort" type="number" value={smtpSettings.smtpPort} onChange={handleSmtpChange} /></div><div className="space-y-2"><Label htmlFor="smtpUser">SMTP Username</Label><Input id="smtpUser" value={smtpSettings.smtpUser} onChange={handleSmtpChange} /></div><div className="space-y-2"><Label htmlFor="smtpPass">SMTP Password</Label><Input id="smtpPass" type="password" value={smtpSettings.smtpPass} onChange={handleSmtpChange} placeholder="Masukkan password SMTP" /></div></div><div className="space-y-4"><div className="space-y-2"><Label htmlFor="fromEmail">From Email</Label><Input id="fromEmail" value={smtpSettings.fromEmail} onChange={handleSmtpChange} placeholder='ISO System <noreply@contoh.co.id>' /></div></div><div className="flex justify-end"><Button onClick={handleSaveSmtp} disabled={isSavingSmtp}>{isSavingSmtp ? 'Menyimpan...' : 'Simpan Pengaturan SMTP'}</Button></div><Separator /><div className="space-y-4"><h3 className="text-lg font-medium">Kirim Email Tes</h3><div className="space-y-2"><Label htmlFor="testEmailRecipient">Email Penerima Tes</Label><Input id="testEmailRecipient" type="email" placeholder="penerima@example.com" value={testEmailRecipient} onChange={(e) => setTestEmailRecipient(e.target.value)} /></div><div className="flex space-x-2"><Button variant="outline" onClick={() => handleEmailTest('verify')} disabled={isTestingEmail}>{isTestingEmail ? 'Menguji...' : 'Test Koneksi'}</Button><Button variant="outline" onClick={() => handleEmailTest('test')} disabled={isTestingEmail}>{isTestingEmail ? 'Mengirim...' : 'Kirim Test Email'}</Button></div></div></CardContent></Card><Card><CardHeader><CardTitle>PIC Default OJK</CardTitle><CardDescription>Daftar PIC yang akan menerima notifikasi email untuk laporan OJK yang tidak memiliki PIC khusus.</CardDescription></CardHeader><CardContent className="space-y-4"><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b"><th className="text-left py-2 px-3">Nama</th><th className="text-left py-2 px-3">Email</th><th className="text-left py-2 px-3">Jabatan</th><th className="text-left py-2 px-3 w-20">Aksi</th></tr></thead><tbody>{ojkPics.length === 0 ? (<tr><td colSpan={4} className="text-center py-4 text-muted-foreground">Belum ada PIC default. Tambahkan PIC di bawah.</td></tr>) : (ojkPics.map((pic) => (<tr key={pic._id} className="border-b"><td className="py-2 px-3 font-medium">{pic.name}</td><td className="py-2 px-3">{pic.email}</td><td className="py-2 px-3">{pic.jabatan || '-'}</td><td className="py-2 px-3"><Button variant="ghost" size="sm" onClick={() => handleDeletePic(pic._id, pic.name)}><Trash2 className="h-4 w-4 text-red-500" /></Button></td></tr>)))}</tbody></table></div><Separator /><h4 className="text-sm font-medium">Tambah PIC Baru</h4><div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Input placeholder="Nama PIC" value={newPic.name} onChange={(e) => setNewPic({ ...newPic, name: e.target.value })} /><Input placeholder="Email PIC" type="email" value={newPic.email} onChange={(e) => setNewPic({ ...newPic, email: e.target.value })} /><Input placeholder="Jabatan (opsional)" value={newPic.jabatan} onChange={(e) => setNewPic({ ...newPic, jabatan: e.target.value })} /></div><div className="flex justify-end"><Button onClick={handleAddPic} disabled={isAddingPic}><Plus className="mr-2 h-4 w-4" />{isAddingPic ? 'Menambah...' : 'Tambah PIC'}</Button></div></CardContent></Card><Card><CardHeader><CardTitle>Template Notifikasi</CardTitle><CardDescription>Kelola template email notifikasi</CardDescription></CardHeader><CardContent><div className="space-y-4">{notificationTemplates.length === 0 ? (<div className="text-center p-4 text-muted-foreground">Memuat template...</div>) : notificationTemplates.map((template) => (<div key={template.id} className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg gap-4"><div className="flex items-start space-x-3"><Mail className="h-5 w-5 text-blue-500 mt-0.5" /><div><div className="font-medium">{template.name}</div><div className="text-sm text-muted-foreground">{template.description}</div><div className="text-xs text-muted-foreground mt-1">Dikirim H-{template.daysBeforeNotify} • PIC: {template.picName || '-'} ({template.picEmail || '-'})</div></div></div><div className="flex items-center space-x-2"><Badge variant={template.status === "Aktif" ? "default" : "secondary"}>{template.status}</Badge><Button variant="ghost" size="sm" onClick={() => { setEditingTemplate(template); setIsEditTemplateOpen(true); }}><Edit className="h-4 w-4" /></Button></div></div>))}</div></CardContent></Card><Card><CardHeader><CardTitle>Pengaturan Notifikasi</CardTitle></CardHeader><CardContent className="space-y-4"><div className="space-y-4"><div className="flex items-center justify-between"><div className="space-y-0.5"><Label>Email Notifications</Label><p className="text-sm text-muted-foreground">Kirim notifikasi melalui email</p></div><Switch defaultChecked /></div><div className="flex items-center justify-between"><div className="space-y-0.5"><Label>Push Notifications</Label><p className="text-sm text-muted-foreground">Notifikasi push di browser</p></div><Switch defaultChecked /></div><div className="flex items-center justify-between"><div className="space-y-0.5"><Label>SMS Notifications</Label><p className="text-sm text-muted-foreground">Notifikasi melalui SMS (untuk alert kritis)</p></div><Switch /></div></div><Separator /><div className="space-y-4"><h3 className="text-lg font-medium">Frekuensi Notifikasi</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="space-y-2"><Label htmlFor="audit-reminder">Pengingat Audit (hari sebelum)</Label><Input id="audit-reminder" type="number" defaultValue="7" /></div><div className="space-y-2"><Label htmlFor="capa-reminder">Pengingat CAPA (hari sebelum)</Label><Input id="capa-reminder" type="number" defaultValue="3" /></div><div className="space-y-2"><Label htmlFor="doc-review">Review Dokumen (hari sebelum)</Label><Input id="doc-review" type="number" defaultValue="14" /></div><div className="space-y-2"><Label htmlFor="training-reminder">Pengingat Training (hari sebelum)</Label><Input id="training-reminder" type="number" defaultValue="5" /></div></div></div></CardContent></Card></div></TabsContent>
+                        {/* Migration Tab */}
+                        <TabsContent value="migration">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Migrasi Database</CardTitle>
+                                    <CardDescription>Salin data dari database lama ke database tenant aktif</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-4">
+                                        <p className="text-muted-foreground">
+                                            Gunakan halaman ini untuk memigrasikan data dari database lama (isoIntegratedSystemDB) ke database tenant Anda saat ini.
+                                        </p>
+                                        <Button onClick={() => window.location.href = '/settings/migrate'}>
+                                            <Upload className="mr-2 h-4 w-4" />
+                                            Buka Halaman Migrasi
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                        {/* Company Management Tab - Super Admin Only */}
+                        {isSuperAdmin && (
+                            <TabsContent value="companies">
+                                <CompanyManagement isSuperAdmin={isSuperAdmin} />
+                            </TabsContent>
+                        )}
+                    </div>
+                </div>
+            </Tabs>
+
+            {/* --- Dialog untuk Edit --- */}
+            <Dialog open={isEditTemplateOpen} onOpenChange={setIsEditTemplateOpen}><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>Edit Template Notifikasi</DialogTitle></DialogHeader>{editingTemplate && (<form onSubmit={handleUpdateTemplate} className="space-y-4 py-4"><div className="space-y-2"><Label htmlFor="edit-tpl-name">Nama Template</Label><Input id="edit-tpl-name" value={editingTemplate.name} disabled /></div><div className="space-y-2"><Label htmlFor="edit-tpl-desc">Deskripsi</Label><Textarea id="edit-tpl-desc" value={editingTemplate.description} onChange={(e) => setEditingTemplate(prev => prev ? { ...prev, description: e.target.value } : null)} required /></div><div className="space-y-2"><Label htmlFor="edit-tpl-status">Status</Label><select id="edit-tpl-status" className="w-full p-2 rounded-md border border-input bg-background" value={editingTemplate.status} onChange={(e) => setEditingTemplate(prev => prev ? { ...prev, status: e.target.value } : null)}><option value="Aktif">Aktif</option><option value="Tidak Aktif">Tidak Aktif</option></select></div><div className="space-y-2"><Label htmlFor="edit-tpl-days">Hari Sebelum Jatuh Tempo (Kirim Notifikasi)</Label><Input id="edit-tpl-days" type="number" value={editingTemplate.daysBeforeNotify || 0} onChange={(e) => setEditingTemplate(prev => prev ? { ...prev, daysBeforeNotify: parseInt(e.target.value) || 0 } : null)} /></div><div className="space-y-2"><Label htmlFor="edit-tpl-picname">Nama PIC Default (Opsional)</Label><Input id="edit-tpl-picname" value={editingTemplate.picName || ''} onChange={(e) => setEditingTemplate(prev => prev ? { ...prev, picName: e.target.value } : null)} placeholder="Contoh: Manajer Kepatuhan" /></div><div className="space-y-2"><Label htmlFor="edit-tpl-picemail">Email PIC Default (Opsional)</Label><Input id="edit-tpl-picemail" type="email" value={editingTemplate.picEmail || ''} onChange={(e) => setEditingTemplate(prev => prev ? { ...prev, picEmail: e.target.value } : null)} placeholder="Contoh: manager@contoh.com" /></div><DialogFooter><Button type="button" variant="outline" onClick={() => setIsEditTemplateOpen(false)}>Batal</Button><Button type="submit" disabled={isLoading}>{isLoading ? 'Menyimpan...' : 'Simpan Perubahan'}</Button></DialogFooter></form>)}</DialogContent></Dialog>
+
+            <Dialog open={isEditDepartmentOpen} onOpenChange={setIsEditDepartmentOpen}><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>Edit Departemen</DialogTitle></DialogHeader>{editingDepartment && (<form onSubmit={handleUpdateDepartment} className="space-y-4 py-4"><div className="space-y-2"><Label htmlFor="edit-dept-name">Nama Departemen</Label><Input id="edit-dept-name" value={editingDepartment.name} onChange={(e) => setEditingDepartment(prev => prev ? { ...prev, name: e.target.value } : null)} required /></div><div className="space-y-2"><Label htmlFor="edit-dept-head">Kepala Departemen</Label><Input id="edit-dept-head" value={editingDepartment.head} onChange={(e) => setEditingDepartment(prev => prev ? { ...prev, head: e.target.value } : null)} required /></div><DialogFooter><Button type="button" variant="outline" onClick={() => setIsEditDepartmentOpen(false)}>Batal</Button><Button type="submit" disabled={isLoading}>{isLoading ? 'Memperbarui...' : 'Simpan Perubahan'}</Button></DialogFooter></form>)}</DialogContent></Dialog>
+            <Dialog open={isEditApproverOpen} onOpenChange={setIsEditApproverOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Edit Jabatan Approval</DialogTitle>
+                    </DialogHeader>
+                    {editingApprover && (
+                        <form onSubmit={handleUpdateApprover} className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="edit-approver-title">Nama Jabatan</Label>
+                                <Input
+                                    id="edit-approver-title"
+                                    value={editingApprover.title}
+                                    onChange={(e) => setEditingApprover(prev => prev ? { ...prev, title: e.target.value } : null)}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="edit-approver-name">Nama Penanggung Jawab</Label>
+                                <Input
+                                    id="edit-approver-name"
+                                    value={editingApprover.name}
+                                    onChange={(e) => setEditingApprover(prev => prev ? { ...prev, name: e.target.value } : null)}
+                                    required
+                                />
+                            </div>
+                            <DialogFooter>
+                                <Button type="button" variant="outline" onClick={() => setIsEditApproverOpen(false)}>Batal</Button>
+                                <Button type="submit" disabled={isLoading}>{isLoading ? 'Memperbarui...' : 'Simpan Perubahan'}</Button>
+                            </DialogFooter>
+                        </form>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={deleteConfirm.open} onOpenChange={(open) => setDeleteConfirm({ ...deleteConfirm, open })}><DialogContent className="sm:max-w-[425px]"><DialogHeader><DialogTitle>Konfirmasi Penghapusan</DialogTitle><DialogDescription>Apakah Anda yakin ingin menghapus <b>{deleteConfirm.name}</b>? Tindakan ini tidak dapat dibatalkan.</DialogDescription></DialogHeader><DialogFooter><Button type="button" variant="outline" onClick={() => setDeleteConfirm({ open: false, type: null, id: null, name: null })} disabled={isLoading}>Batal</Button><Button type="submit" variant="destructive" disabled={isLoading} onClick={confirmDelete}>{isLoading ? "Menghapus..." : "Hapus"}</Button></DialogFooter></DialogContent></Dialog>
+            <Dialog open={isEditStandardOpen} onOpenChange={setIsEditStandardOpen}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Edit Standar: {editingStandard?.name}</DialogTitle>
+                        <DialogDescription>
+                            Perbarui informasi untuk standar ISO ini.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {editingStandard && (
+                        <form onSubmit={handleUpdateStandard} className="space-y-4 py-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-std-name">Nama Standar (e.g., ISO 9001:2015)</Label>
+                                    <Input
+                                        id="edit-std-name"
+                                        value={editingStandard.name}
+                                        onChange={(e) => setEditingStandard(prev => prev ? { ...prev, name: e.target.value } : null)}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-std-title">Judul Standar</Label>
+                                    <Input
+                                        id="edit-std-title"
+                                        value={editingStandard.title}
+                                        onChange={(e) => setEditingStandard(prev => prev ? { ...prev, title: e.target.value } : null)}
+                                        placeholder="Sistem Manajemen Mutu"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="edit-std-desc">Deskripsi</Label>
+                                <Textarea
+                                    id="edit-std-desc"
+                                    value={editingStandard.description}
+                                    onChange={(e) => setEditingStandard(prev => prev ? { ...prev, description: e.target.value } : null)}
+                                    placeholder="Deskripsi singkat mengenai standar"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-std-category">Kategori</Label>
+                                    <Input
+                                        id="edit-std-category"
+                                        value={editingStandard.category}
+                                        onChange={(e) => setEditingStandard(prev => prev ? { ...prev, category: e.target.value } : null)}
+                                        placeholder="Contoh: Quality"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit-std-status">Status</Label>
+                                    <Input
+                                        id="edit-std-status"
+                                        value={editingStandard.status}
+                                        onChange={(e) => setEditingStandard(prev => prev ? { ...prev, status: e.target.value } : null)}
+                                        placeholder="Contoh: Active"
+                                    />
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button type="button" variant="outline" onClick={() => setIsEditStandardOpen(false)}>Batal</Button>
+                                <Button type="submit" disabled={isLoading}>
+                                    {isLoading ? 'Memperbarui...' : 'Simpan Perubahan'}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            <UserMatrixModal
+                isOpen={isUserMatrixOpen}
+                onOpenChange={setIsUserMatrixOpen}
+                matrixData={userMatrixData}
+            />
+            <AddUserModal
+                isOpen={isAddUserModalOpen}
+                onOpenChange={setIsAddUserModalOpen}
+                departments={departments}
+                users={users}
+                onUserAdded={fetchData}
+            />
+            <EditUserModal
+                isOpen={isEditUserModalOpen}
+                onOpenChange={setIsEditUserModalOpen}
+                departments={departments}
+                users={users}
+                editingUser={editingUser}
+                onUserUpdated={fetchData}
+            />
+        </div>
+    )
+}
